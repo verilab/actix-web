@@ -1,4 +1,3 @@
-use std::cell::RefCell;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
@@ -10,11 +9,11 @@ use actix_service::Service;
 /// # Panics
 /// CloneableService might panic with some creative use of thread local storage.
 /// See https://github.com/actix/actix-web/issues/1295 for example
-pub(crate) struct CloneableService<T: Service>(Rc<RefCell<T>>);
+pub(crate) struct CloneableService<T: Service>(Rc<T>);
 
 impl<T: Service> CloneableService<T> {
     pub(crate) fn new(service: T) -> Self {
-        Self(Rc::new(RefCell::new(service)))
+        Self(Rc::new(service))
     }
 }
 
@@ -31,10 +30,10 @@ impl<T: Service> Service for CloneableService<T> {
     type Future = T::Future;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.0.borrow_mut().poll_ready(cx)
+        self.0.poll_ready(cx)
     }
 
     fn call(&self, req: T::Request) -> Self::Future {
-        self.0.borrow_mut().call(req)
+        self.0.call(req)
     }
 }

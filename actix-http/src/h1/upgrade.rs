@@ -2,9 +2,9 @@ use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
 use actix_codec::Framed;
+use actix_server::ServiceStream;
 use actix_service::{Service, ServiceFactory};
 use futures_util::future::Ready;
-use actix_server::ServiceStream;
 
 use crate::error::Error;
 use crate::h1::Codec;
@@ -32,11 +32,11 @@ impl<T: ServiceStream> Service for UpgradeHandler<T> {
     type Error = Error;
     type Future = Ready<Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _: Self::Request) -> Self::Future {
+    fn call(&self, _: Self::Request) -> Self::Future {
         unimplemented!()
     }
 }

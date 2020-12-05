@@ -30,11 +30,11 @@ impl<T: Service> Service for CloneableService<T> {
     type Error = T::Error;
     type Future = T::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.0.borrow_mut().poll_ready(cx)
     }
 
-    fn call(&mut self, req: T::Request) -> Self::Future {
+    fn call(&self, req: T::Request) -> Self::Future {
         self.0.borrow_mut().call(req)
     }
 }

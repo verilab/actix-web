@@ -391,7 +391,7 @@ where
         >,
     >
     where
-        F: FnMut(ServiceRequest, &mut T::Service) -> R + Clone,
+        F: Fn(ServiceRequest, &T::Service) -> R + Clone,
         R: Future<Output = Result<ServiceResponse, Error>>,
     {
         Scope {
@@ -608,11 +608,11 @@ impl Service for ScopeService {
     type Error = Error;
     type Future = Either<BoxedResponse, Ready<Result<Self::Response, Self::Error>>>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let res = self.router.recognize_mut_checked(&mut req, |req, guards| {
             if let Some(ref guards) = guards {
                 for f in guards {
@@ -629,7 +629,7 @@ impl Service for ScopeService {
                 req.add_data_container(data.clone());
             }
             Either::Left(srv.call(req))
-        } else if let Some(ref mut default) = self.default {
+        } else if let Some(ref default) = self.default {
             if let Some(ref data) = self.data {
                 req.add_data_container(data.clone());
             }

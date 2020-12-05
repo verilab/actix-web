@@ -316,7 +316,7 @@ where
     type Error = DispatchError;
     type Future = H2ServiceHandlerResponse<T, S, B>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.srv.poll_ready(cx).map_err(|e| {
             let e = e.into();
             error!("Service readiness error: {:?}", e);
@@ -324,7 +324,7 @@ where
         })
     }
 
-    fn call(&mut self, (io, addr): Self::Request) -> Self::Future {
+    fn call(&self, (io, addr): Self::Request) -> Self::Future {
         let deprecated_on_connect = self.on_connect.as_ref().map(|handler| handler(&io));
 
         let mut connect_extensions = Extensions::new();

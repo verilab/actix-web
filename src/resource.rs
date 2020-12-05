@@ -325,7 +325,7 @@ where
         >,
     >
     where
-        F: FnMut(ServiceRequest, &mut T::Service) -> R + Clone,
+        F: Fn(ServiceRequest, &T::Service) -> R + Clone,
         R: Future<Output = Result<ServiceResponse, Error>>,
     {
         Resource {
@@ -426,12 +426,12 @@ pub struct ResourceFactory {
 }
 
 impl ServiceFactory for ResourceFactory {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
-    type InitError = ();
+    type Config = ();
     type Service = ResourceService;
+    type InitError = ();
     type Future = CreateResourceService;
 
     fn new_service(&self, _: ()) -> Self::Future {
@@ -529,12 +529,12 @@ impl Service for ResourceService {
         LocalBoxFuture<'static, Result<ServiceResponse, Error>>,
     >;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, mut req: ServiceRequest) -> Self::Future {
-        for route in self.routes.iter_mut() {
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
+        for route in self.routes.iter() {
             if route.check(&mut req) {
                 if let Some(ref data) = self.data {
                     req.add_data_container(data.clone());
@@ -542,7 +542,7 @@ impl Service for ResourceService {
                 return Either::Right(route.call(req));
             }
         }
-        if let Some(ref mut default) = self.default {
+        if let Some(ref default) = self.default {
             if let Some(ref data) = self.data {
                 req.add_data_container(data.clone());
             }

@@ -64,12 +64,12 @@ impl Route {
 }
 
 impl ServiceFactory for Route {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
-    type InitError = ();
+    type Config = ();
     type Service = RouteService;
+    type InitError = ();
     type Future = CreateRouteService;
 
     fn new_service(&self, _: ()) -> Self::Future {
@@ -130,12 +130,12 @@ impl Service for RouteService {
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
-        self.service.call(req).boxed_local()
+    fn call(&self, req: ServiceRequest) -> Self::Future {
+        self.service.call(req)
     }
 }
 
@@ -275,12 +275,12 @@ where
     T::Service: 'static,
     <T::Service as Service>::Future: 'static,
 {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
-    type InitError = ();
+    type Config = ();
     type Service = BoxedRouteService<ServiceRequest, Self::Response>;
+    type InitError = ();
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
@@ -316,11 +316,11 @@ where
     type Error = Error;
     type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx).map_err(|(e, _)| e)
     }
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         // let mut fut = self.service.call(req);
         self.service
             .call(req)

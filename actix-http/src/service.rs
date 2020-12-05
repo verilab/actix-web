@@ -537,7 +537,7 @@ where
     type Error = DispatchError;
     type Future = HttpServiceHandlerResponse<T, S, B, X, U>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let ready = self
             .expect
             .poll_ready(cx)
@@ -559,7 +559,7 @@ where
             .is_ready()
             && ready;
 
-        let ready = if let Some(ref mut upg) = self.upgrade {
+        let ready = if let Some(ref upg) = self.upgrade {
             upg.poll_ready(cx)
                 .map_err(|e| {
                     let e = e.into();
@@ -579,7 +579,7 @@ where
         }
     }
 
-    fn call(&mut self, (io, proto, peer_addr): Self::Request) -> Self::Future {
+    fn call(&self, (io, proto, peer_addr): Self::Request) -> Self::Future {
         let mut connect_extensions = Extensions::new();
 
         let deprecated_on_connect = self.on_connect.as_ref().map(|handler| handler(&io));

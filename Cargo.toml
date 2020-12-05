@@ -133,10 +133,14 @@ actix-multipart = { path = "actix-multipart" }
 actix-files = { path = "actix-files" }
 awc = { path = "awc" }
 
-#actix-rt = { path = "../actix-net-fs/actix-rt" }
-#actix-server = { path = "../actix-net-fs/actix-server" }
-#actix-tls = { path = "../actix-net-fs/actix-tls" }
-#actix-testing = { path = "../actix-net-fs/actix-testing" }
+actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
 
 [[bench]]
 name = "server"

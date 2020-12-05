@@ -454,7 +454,7 @@ where
     type Error = DispatchError;
     type Future = Dispatcher<T, S, B, X, U>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         let ready = self
             .expect
             .poll_ready(cx)
@@ -476,7 +476,7 @@ where
             .is_ready()
             && ready;
 
-        let ready = if let Some(ref mut upg) = self.upgrade {
+        let ready = if let Some(ref upg) = self.upgrade {
             upg.poll_ready(cx)
                 .map_err(|e| {
                     let e = e.into();
@@ -496,7 +496,7 @@ where
         }
     }
 
-    fn call(&mut self, (io, addr): Self::Request) -> Self::Future {
+    fn call(&self, (io, addr): Self::Request) -> Self::Future {
         let deprecated_on_connect = self.on_connect.as_ref().map(|handler| handler(&io));
 
         let mut connect_extensions = Extensions::new();
@@ -573,11 +573,11 @@ where
     type Error = ParseError;
     type Future = OneRequestServiceResponse<T>;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, req: Self::Request) -> Self::Future {
+    fn call(&self, req: Self::Request) -> Self::Future {
         OneRequestServiceResponse {
             framed: Some(Framed::new(req, Codec::new(self.config.clone()))),
         }

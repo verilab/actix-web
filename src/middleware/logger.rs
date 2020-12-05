@@ -227,11 +227,11 @@ where
     type Error = Error;
     type Future = LoggerResponse<S, B>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: ServiceRequest) -> Self::Future {
         if self.inner.exclude.contains(req.path())
             || self.inner.exclude_regex.is_match(req.path())
         {

@@ -233,11 +233,11 @@ where
     type Error = T::Error;
     type Future = T::Future;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Request) -> Self::Future {
+    fn call(&self, req: Request) -> Self::Future {
         let (head, payload) = req.into_parts();
 
         let req = if let Some(mut req) = self.pool.get_request() {
@@ -278,12 +278,12 @@ pub struct AppRoutingFactory {
 }
 
 impl ServiceFactory for AppRoutingFactory {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
-    type InitError = ();
+    type Config = ();
     type Service = AppRouting;
+    type InitError = ();
     type Future = AppRoutingFactoryResponse;
 
     fn new_service(&self, _: ()) -> Self::Future {
@@ -394,7 +394,7 @@ impl Service for AppRouting {
     type Error = Error;
     type Future = BoxResponse;
 
-    fn poll_ready(&mut self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         if self.ready.is_none() {
             Poll::Ready(Ok(()))
         } else {
@@ -402,7 +402,7 @@ impl Service for AppRouting {
         }
     }
 
-    fn call(&mut self, mut req: ServiceRequest) -> Self::Future {
+    fn call(&self, mut req: ServiceRequest) -> Self::Future {
         let res = self.router.recognize_mut_checked(&mut req, |req, guards| {
             if let Some(ref guards) = guards {
                 for f in guards {
@@ -416,7 +416,7 @@ impl Service for AppRouting {
 
         if let Some((srv, _info)) = res {
             srv.call(req)
-        } else if let Some(ref mut default) = self.default {
+        } else if let Some(ref default) = self.default {
             default.call(req)
         } else {
             let req = req.into_parts().0;

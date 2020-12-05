@@ -1,9 +1,10 @@
 //! Custom handlers service for responses.
+use std::future::{ready, Future, Ready};
+use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
-use futures_util::future::{ok, FutureExt, LocalBoxFuture, Ready};
 use fxhash::FxHashMap;
 
 use crate::dev::{ServiceRequest, ServiceResponse};
@@ -15,7 +16,7 @@ pub enum ErrorHandlerResponse<B> {
     /// New http response got generated
     Response(ServiceResponse<B>),
     /// Result is a future that resolves to a new http response
-    Future(LocalBoxFuture<'static, Result<ServiceResponse<B>, Error>>),
+    Future(Pin<Box<dyn Future<Output = Result<ServiceResponse<B>, Error>>>>),
 }
 
 type ErrorHandler<B> = dyn Fn(ServiceResponse<B>) -> Result<ErrorHandlerResponse<B>>;
@@ -90,15 +91,15 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type InitError = ();
     type Transform = ErrorHandlersMiddleware<S, B>;
+    type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(ErrorHandlersMiddleware {
+        ready(Ok(ErrorHandlersMiddleware {
             service,
             handlers: self.handlers.clone(),
-        })
+        }))
     }
 }
 
@@ -117,7 +118,7 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
@@ -140,7 +141,6 @@ where
                 Ok(res)
             }
         }
-        .boxed_local()
     }
 }
 

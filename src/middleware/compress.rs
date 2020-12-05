@@ -59,8 +59,8 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<Encoder<B>>;
     type Error = Error;
-    type InitError = ();
     type Transform = CompressMiddleware<S>;
+    type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {

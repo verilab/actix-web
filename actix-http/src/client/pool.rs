@@ -100,11 +100,11 @@ where
     type Error = ConnectError;
     type Future = LocalBoxFuture<'static, Result<IoConnection<Io>, ConnectError>>;
 
-    fn poll_ready(&mut self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
+    fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.0.poll_ready(cx)
     }
 
-    fn call(&mut self, req: Connect) -> Self::Future {
+    fn call(&self, req: Connect) -> Self::Future {
         let mut connector = self.0.clone();
         let inner = self.1.clone();
 

@@ -188,8 +188,8 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<StreamLog<B>>;
     type Error = Error;
-    type InitError = ();
     type Transform = LoggerMiddleware<S>;
+    type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {

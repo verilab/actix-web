@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 
 use actix_http::{http::Method, Error};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ready, FutureExt, LocalBoxFuture};
+use futures_util::future::{ready, LocalBoxFuture};
 
 use crate::extract::FromRequest;
 use crate::guard::{self, Guard};
@@ -284,17 +284,16 @@ where
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        self.service
-            .new_service(())
-            .map(|result| match result {
+        let fut = self.service.new_service(());
+        Box::pin(async move {
+            match fut.await {
                 Ok(service) => {
-                    let service: BoxedRouteService<_, _> =
-                        Box::new(RouteServiceWrapper { service });
+                    let service = Box::new(RouteServiceWrapper { service }) as _;
                     Ok(service)
                 }
                 Err(_) => Err(()),
-            })
-            .boxed_local()
+            }
+        })
     }
 }
 
@@ -321,14 +320,13 @@ where
     }
 
     fn call(&self, req: ServiceRequest) -> Self::Future {
-        // let mut fut = self.service.call(req);
-        self.service
-            .call(req)
-            .map(|res| match res {
+        let fut = self.service.call(req);
+        Box::pin(async move {
+            match fut.await {
                 Ok(res) => Ok(res),
                 Err((err, req)) => Ok(req.error_response(err)),
-            })
-            .boxed_local()
+            }
+        })
 
         // match fut.poll() {
         //     Poll::Ready(Ok(res)) => Either::Left(ok(res)),

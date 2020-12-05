@@ -266,6 +266,11 @@ impl HttpMessage for ServiceRequest {
         &self.head().headers
     }
 
+    #[inline]
+    fn take_payload(&mut self) -> Payload<Self::Stream> {
+        Rc::get_mut(&mut (self.0).0).unwrap().payload.take()
+    }
+
     /// Request extensions
     #[inline]
     fn extensions(&self) -> Ref<'_, Extensions> {
@@ -276,11 +281,6 @@ impl HttpMessage for ServiceRequest {
     #[inline]
     fn extensions_mut(&self) -> RefMut<'_, Extensions> {
         self.0.extensions_mut()
-    }
-
-    #[inline]
-    fn take_payload(&mut self) -> Payload<Self::Stream> {
-        Rc::get_mut(&mut (self.0).0).unwrap().payload.take()
     }
 }
 

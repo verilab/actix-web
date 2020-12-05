@@ -569,12 +569,12 @@ impl ResourceEndpoint {
 }
 
 impl ServiceFactory for ResourceEndpoint {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
-    type InitError = ();
+    type Config = ();
     type Service = ResourceService;
+    type InitError = ();
     type Future = CreateResourceService;
 
     fn new_service(&self, _: ()) -> Self::Future {

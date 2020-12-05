@@ -1,10 +1,10 @@
 //! Middleware for setting default response headers
 use std::convert::TryFrom;
+use std::future::{ready, Future, Ready};
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
-use futures_util::future::{ok, FutureExt, LocalBoxFuture, Ready};
 
 use crate::http::header::{HeaderName, HeaderValue, CONTENT_TYPE};
 use crate::http::{Error as HttpError, HeaderMap};
@@ -97,15 +97,15 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type InitError = ();
     type Transform = DefaultHeadersMiddleware<S>;
+    type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(DefaultHeadersMiddleware {
+        ready(Ok(DefaultHeadersMiddleware {
             service,
             inner: self.inner.clone(),
-        })
+        }))
     }
 }
 
@@ -122,7 +122,7 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self::Response, Self::Error>>;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
@@ -151,7 +151,6 @@ where
             }
             Ok(res)
         }
-        .boxed_local()
     }
 }
 

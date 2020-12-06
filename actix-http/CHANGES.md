@@ -9,6 +9,9 @@
 * `Accept::mime_precedence` and `Accept::mime_preference`. [#1793]
 * `TryFrom<u16>` and `TryFrom<f32>` for `http::header::Quality`. [#1797]
 
+### Changed
+* Upgrade `bytes` to `0.6`. 
+
 ### Fixed
 * Started dropping `transfer-encoding: chunked` and `Content-Length` for 1XX and 204 responses. [#1767]
 

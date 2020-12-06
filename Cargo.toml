@@ -88,7 +88,7 @@ actix-web-codegen = "0.4.0"
 actix-http = "2.2.0"
 #awc = { version = "2.0.3", default-features = false }
 
-bytes = "0.5.3"
+bytes = "0.6"
 derive_more = "0.99.5"
 encoding_rs = "0.8"
 futures-channel = { version = "0.3.5", default-features = false }
@@ -133,14 +133,18 @@ actix-multipart = { path = "actix-multipart" }
 actix-files = { path = "actix-files" }
 awc = { path = "awc" }
 
-actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
-actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "feat/type_alias_impl_trait" }
+# FIXME: remove these override
+actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+h2 = { git = "https://github.com/hyperium/h2.git" }
+http = { git = "https://github.com/paolobarbolini/http.git", branch = "bytes06" }
 
 [[bench]]
 name = "server"

@@ -920,7 +920,7 @@ fn read<T>(
 where
     T: AsyncRead + Unpin,
 {
-    Pin::new(io).poll_read_buf(cx, buf)
+    actix_codec::poll_read_buf(Pin::new(io), cx, buf)
 }
 
 #[cfg(test)]

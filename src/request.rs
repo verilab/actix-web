@@ -277,13 +277,13 @@ impl HttpMessage for HttpRequest {
 impl Drop for HttpRequest {
     fn drop(&mut self) {
         // if possible, contribute to current worker's HttpRequest allocation pool
-        // if Rc::strong_count(&self.0) == 1 {
-        //     let v = &mut self.0.pool.0.borrow_mut();
-        //     if v.len() < 128 {
-        //         self.extensions_mut().clear();
-        //         v.push(self.0.clone());
-        //     }
-        // }
+        if Rc::strong_count(&self.0) == 1 {
+            let v = &mut self.0.pool.0.borrow_mut();
+            if v.len() < 128 {
+                self.extensions_mut().clear();
+                v.push(self.0.clone());
+            }
+        }
     }
 }
 

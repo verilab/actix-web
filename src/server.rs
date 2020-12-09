@@ -11,7 +11,7 @@ use actix_http::{
 };
 use actix_rt::net::TcpStream;
 use actix_rt::{ActixRtFactory, RuntimeFactory};
-use actix_server::{Server, ServerBuilder, ServiceStream};
+use actix_server::{Server, DefaultServerBuilder, ServerBuilder, ServiceStream};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 
 #[cfg(unix)]
@@ -57,7 +57,7 @@ struct Config {
 ///         .await
 /// }
 /// ```
-pub struct HttpServer<F, I, S, B, RT = ActixRtFactory>
+pub struct HttpServer<F, I, S, B, BD = DefaultServerBuilder, RT = ActixRtFactory>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -66,15 +66,16 @@ where
     S::InitError: fmt::Debug,
     S::Response: Into<Response<B>>,
     B: MessageBody,
+    BD: ServerBuilder<RT>,
     RT: RuntimeFactory
 {
     pub(super) factory: F,
     config: Arc<Mutex<Config>>,
     backlog: u32,
     sockets: Vec<Socket>,
-    builder: ServerBuilder<RT>,
+    builder: BD,
     on_connect_fn: Option<Arc<dyn Fn(&dyn Any, &mut Extensions) + Send + Sync>>,
-    _t: PhantomData<(S, B)>,
+    _t: PhantomData<(S, B, RT)>,
 }
 
 impl<F, I, S, B> HttpServer<F, I, S, B>
@@ -90,11 +91,6 @@ where
 {
     /// Create new http server with application factory
     pub fn new(factory: F) -> Self {
-        Self::new_with::<ActixRtFactory>(factory)
-    }
-
-    /// Create new http server with application factory
-    pub fn new_with<RT: RuntimeFactory>(factory: F) -> HttpServer<F, I, S, B, RT> {
         HttpServer {
             factory,
             config: Arc::new(Mutex::new(Config {
@@ -105,14 +101,14 @@ where
             })),
             backlog: 1024,
             sockets: Vec::new(),
-            builder: ServerBuilder::<RT>::new(),
+            builder: DefaultServerBuilder::new(),
             on_connect_fn: None,
             _t: PhantomData,
         }
     }
 }
 
-impl<F, I, S, B, RT> HttpServer<F, I, S, B, RT>
+impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -122,8 +118,25 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    RT: RuntimeFactory,
+    BD: ServerBuilder<RT>,
+    RT: RuntimeFactory
 {
+    pub fn builder<BD2, RT2>(self, builder: BD2) -> HttpServer<F, I, S, B, BD2, RT2>
+    where
+        BD2: ServerBuilder<RT2>,
+        RT2: RuntimeFactory
+    {
+        HttpServer {
+            factory: self.factory,
+            config: self.config,
+            backlog: self.backlog,
+            sockets: self.sockets,
+            builder,
+            on_connect_fn: self.on_connect_fn,
+            _t: PhantomData,
+        }
+    }
+
     /// Sets function that will be called once before each connection is handled.
     /// It will receive a `&std::any::Any`, which contains underlying connection type and an
     /// [Extensions] container so that request-local data can be passed to middleware and handlers.
@@ -294,7 +307,7 @@ where
     /// To bind multiple addresses this method can be called multiple times.
     pub fn bind_with<St, A>(mut self, addrs: A) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
         A: net::ToSocketAddrs,
     {
         let cfg = self.config.clone();
@@ -303,32 +316,32 @@ where
 
         let addr = addrs.to_socket_addrs()?.collect::<Vec<_>>().pop().unwrap();
 
-        self.builder = self.builder.bind::<_,_,_, St>(
-            "actix-web-service",
-            addr,
-            move || {
-                let c = cfg.lock().unwrap();
-                let cfg = AppConfig::new(
-                    false,
-                    addr,
-                    c.host.clone().unwrap_or("host".into()),
-                );
+        self.builder =
+            self.builder
+                .bind::<_, _, _, St>("actix-web-service", addr, move || {
+                    let c = cfg.lock().unwrap();
+                    let cfg = AppConfig::new(
+                        false,
+                        addr,
+                        c.host.clone().unwrap_or("host".into()),
+                    );
 
-                let svc = HttpService::build()
-                    .keep_alive(c.keep_alive)
-                    .client_timeout(c.client_timeout);
+                    let svc = HttpService::build()
+                        .keep_alive(c.keep_alive)
+                        .client_timeout(c.client_timeout);
                     // .local_addr(addr);
 
-                let svc = if let Some(handler) = on_connect_fn.clone() {
-                    svc.on_connect_ext(move |io, ext: _| (handler)(io as &dyn Any, ext))
-                } else {
-                    svc
-                };
+                    let svc = if let Some(handler) = on_connect_fn.clone() {
+                        svc.on_connect_ext(move |io, ext: _| {
+                            (handler)(io as &dyn Any, ext)
+                        })
+                    } else {
+                        svc
+                    };
 
-                svc.finish(map_config(factory(), move |_| cfg.clone()))
-                    .tcp()
-            },
-        )?;
+                    svc.finish(map_config(factory(), move |_| cfg.clone()))
+                        .tcp()
+                })?;
         Ok(self)
     }
 
@@ -358,72 +371,8 @@ where
     }
 }
 
-// #[cfg(unix)]
-// impl<F, I, S, B, RT> HttpServer<F, I, S, B, RT>
-// where
-//     F: Fn() -> I + Send + Clone + 'static,
-//     I: IntoServiceFactory<S>,
-//     S: ServiceFactory<Config = AppConfig, Request = Request>,
-//     S::Error: Into<Error> + 'static,
-//     S::InitError: fmt::Debug,
-//     S::Response: Into<Response<B>> + 'static,
-//     <S::Service as Service>::Future: 'static,
-//     B: MessageBody + 'static,
-//     RT: RuntimeFactory,
-// {
-//     /// Start listening for incoming unix domain connections.
-//     pub fn bind_uds<A>(self, addr: A) -> io::Result<Self>
-//     where
-//         A: AsRef<std::path::Path>,
-//     {
-//         self.bind_uds_with::<actix_rt::net::UnixStream, A>(addr)
-//     }
-//
-//     /// Start listening for incoming unix domain connections with a custom stream type.
-//     pub fn bind_uds_with<St, A>(mut self, addr: A) -> io::Result<Self>
-//     where
-//         St: ServiceStream + Send,
-//         A: AsRef<std::path::Path>,
-//     {
-//         let cfg = self.config.clone();
-//         let factory = self.factory.clone();
-//         let socket_addr = net::SocketAddr::new(
-//             net::IpAddr::V4(net::Ipv4Addr::new(127, 0, 0, 1)),
-//             8080,
-//         );
-//         self.sockets.push(Socket {
-//             scheme: "http",
-//             addr: socket_addr,
-//         });
-//
-//         self.builder = self.builder.bind_uds(
-//             format!("actix-web-service-{:?}", addr.as_ref()),
-//             addr,
-//             move || {
-//                 let c = cfg.lock().unwrap();
-//                 let config = AppConfig::new(
-//                     false,
-//                     socket_addr,
-//                     c.host.clone().unwrap_or_else(|| format!("{}", socket_addr)),
-//                 );
-//                 pipeline_factory(|io: St| {
-//                     let peer_add = io.peer_addr();
-//                     ok((io, Protocol::Http1, peer_add))
-//                 })
-//                 .and_then(
-//                     HttpService::build()
-//                         .keep_alive(c.keep_alive)
-//                         .client_timeout(c.client_timeout)
-//                         .finish(map_config(factory(), move |_| config.clone())),
-//                 )
-//             },
-//         )?;
-//         Ok(self)
-//     }
-// }
-
-#[cfg(feature = "openssl")]
-impl<F, I, S, B, RT> HttpServer<F, I, S, B, RT>
+#[cfg(unix)]
+impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -433,7 +382,73 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    RT: RuntimeFactory,
+    BD: ServerBuilder<RT>,
+    RT: RuntimeFactory
+{
+    /// Start listening for incoming unix domain connections.
+    pub fn bind_uds<A>(self, addr: A) -> io::Result<Self>
+    where
+        A: AsRef<std::path::Path>,
+    {
+        self.bind_uds_with::<actix_rt::net::UnixStream, A>(addr)
+    }
+
+    /// Start listening for incoming unix domain connections with a custom stream type.
+    pub fn bind_uds_with<St, A>(mut self, addr: A) -> io::Result<Self>
+    where
+        St: ServiceStream,
+        A: AsRef<std::path::Path>,
+    {
+        let cfg = self.config.clone();
+        let factory = self.factory.clone();
+        let socket_addr = net::SocketAddr::new(
+            net::IpAddr::V4(net::Ipv4Addr::new(127, 0, 0, 1)),
+            8080,
+        );
+        self.sockets.push(Socket {
+            scheme: "http",
+            addr: socket_addr,
+        });
+
+        self.builder = self.builder.bind_uds(
+            format!("actix-web-service-{:?}", addr.as_ref()),
+            addr,
+            move || {
+                let c = cfg.lock().unwrap();
+                let config = AppConfig::new(
+                    false,
+                    socket_addr,
+                    c.host.clone().unwrap_or_else(|| format!("{}", socket_addr)),
+                );
+                pipeline_factory(|io: St| {
+                    let peer_add = io.peer_addr();
+                    ok((io, Protocol::Http1, peer_add))
+                })
+                .and_then(
+                    HttpService::build()
+                        .keep_alive(c.keep_alive)
+                        .client_timeout(c.client_timeout)
+                        .finish(map_config(factory(), move |_| config.clone())),
+                )
+            },
+        )?;
+        Ok(self)
+    }
+}
+
+#[cfg(feature = "openssl")]
+impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
+where
+    F: Fn() -> I + Send + Clone + 'static,
+    I: IntoServiceFactory<S>,
+    S: ServiceFactory<Config = AppConfig, Request = Request>,
+    S::Error: Into<Error> + 'static,
+    S::InitError: fmt::Debug,
+    S::Response: Into<Response<B>> + 'static,
+    <S::Service as Service>::Future: 'static,
+    B: MessageBody + 'static,
+    BD: ServerBuilder<RT>,
+    RT: RuntimeFactory
 {
     /// Start listening for incoming tls connections.
     ///
@@ -458,7 +473,7 @@ where
         builder: SslAcceptorBuilder,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
         A: net::ToSocketAddrs,
     {
         let sockets = self.bind2(addr)?;
@@ -479,7 +494,7 @@ where
         builder: SslAcceptorBuilder,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
     {
         self.listen_ssl_inner::<St>(lst, openssl_acceptor(builder)?)
     }
@@ -490,7 +505,7 @@ where
         acceptor: SslAcceptor,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
     {
         let factory = self.factory.clone();
         let cfg = self.config.clone();
@@ -535,7 +550,7 @@ where
 }
 
 #[cfg(feature = "rustls")]
-impl<F, I, S, B, RT> HttpServer<F, I, S, B, RT>
+impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -545,7 +560,8 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    RT: RuntimeFactory,
+    BD: ServerBuilder<RT>,
+    RT: RuntimeFactory
 {
     /// Start listening for incoming tls connections.
     ///
@@ -566,7 +582,7 @@ where
         config: RustlsServerConfig,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
         A: net::ToSocketAddrs,
     {
         let sockets = self.bind2(addr)?;
@@ -585,7 +601,7 @@ where
         config: RustlsServerConfig,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
     {
         self.listen_rustls_inner::<St>(lst, config)
     }
@@ -596,7 +612,7 @@ where
         config: RustlsServerConfig,
     ) -> io::Result<Self>
     where
-        St: ServiceStream + Send,
+        St: ServiceStream,
     {
         let factory = self.factory.clone();
         let cfg = self.config.clone();
@@ -638,22 +654,6 @@ where
         )?;
         Ok(self)
     }
-}
-
-fn create_tcp_listener(
-    addr: net::SocketAddr,
-    backlog: i32,
-) -> io::Result<net::TcpListener> {
-    use socket2::{Domain, Protocol, Socket, Type};
-    let domain = match addr {
-        net::SocketAddr::V4(_) => Domain::ipv4(),
-        net::SocketAddr::V6(_) => Domain::ipv6(),
-    };
-    let socket = Socket::new(domain, Type::stream(), Some(Protocol::tcp()))?;
-    socket.set_reuse_address(true)?;
-    socket.bind(&addr.into())?;
-    socket.listen(backlog)?;
-    Ok(socket.into_tcp_listener())
 }
 
 #[cfg(feature = "openssl")]

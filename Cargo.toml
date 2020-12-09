@@ -134,15 +134,16 @@ actix-files = { path = "actix-files" }
 awc = { path = "awc" }
 
 # FIXME: remove these override
-actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
-actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "private" }
+actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+#actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-server = { path = "../actix-net-fs/actix-server" }
+actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
+actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "single-thread" }
 h2 = { git = "https://github.com/hyperium/h2.git" }
 http = { git = "https://github.com/paolobarbolini/http.git", branch = "bytes06" }
 

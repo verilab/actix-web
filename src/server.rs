@@ -11,7 +11,7 @@ use actix_http::{
 };
 use actix_rt::net::TcpStream;
 use actix_rt::{ActixRtFactory, RuntimeFactory};
-use actix_server::{Server, DefaultServerBuilder, ServerBuilder, ServiceStream};
+use actix_server::{Server, ServerBuilder, ServiceStream, SingleThreadServerBuilder};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 
 #[cfg(unix)]
@@ -57,7 +57,7 @@ struct Config {
 ///         .await
 /// }
 /// ```
-pub struct HttpServer<F, I, S, B, BD = DefaultServerBuilder, RT = ActixRtFactory>
+pub struct HttpServer<F, I, S, B, BD = SingleThreadServerBuilder, RT = ActixRtFactory>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -67,7 +67,7 @@ where
     S::Response: Into<Response<B>>,
     B: MessageBody,
     BD: ServerBuilder<RT>,
-    RT: RuntimeFactory
+    RT: RuntimeFactory,
 {
     pub(super) factory: F,
     config: Arc<Mutex<Config>>,
@@ -101,7 +101,7 @@ where
             })),
             backlog: 1024,
             sockets: Vec::new(),
-            builder: DefaultServerBuilder::new(),
+            builder: SingleThreadServerBuilder::new(),
             on_connect_fn: None,
             _t: PhantomData,
         }
@@ -119,12 +119,12 @@ where
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
     BD: ServerBuilder<RT>,
-    RT: RuntimeFactory
+    RT: RuntimeFactory,
 {
     pub fn builder<BD2, RT2>(self, builder: BD2) -> HttpServer<F, I, S, B, BD2, RT2>
     where
         BD2: ServerBuilder<RT2>,
-        RT2: RuntimeFactory
+        RT2: RuntimeFactory,
     {
         HttpServer {
             factory: self.factory,
@@ -366,7 +366,7 @@ where
     ///         .await
     /// }
     /// ```
-    pub fn run(self) -> Server {
+    pub fn run(self) -> Server<RT::Runtime> {
         self.builder.start()
     }
 }
@@ -383,7 +383,7 @@ where
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
     BD: ServerBuilder<RT>,
-    RT: RuntimeFactory
+    RT: RuntimeFactory,
 {
     /// Start listening for incoming unix domain connections.
     pub fn bind_uds<A>(self, addr: A) -> io::Result<Self>
@@ -448,7 +448,7 @@ where
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
     BD: ServerBuilder<RT>,
-    RT: RuntimeFactory
+    RT: RuntimeFactory,
 {
     /// Start listening for incoming tls connections.
     ///
@@ -561,7 +561,7 @@ where
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
     BD: ServerBuilder<RT>,
-    RT: RuntimeFactory
+    RT: RuntimeFactory,
 {
     /// Start listening for incoming tls connections.
     ///

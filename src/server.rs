@@ -9,7 +9,7 @@ use std::{
 use actix_http::{
     body::MessageBody, Error, Extensions, HttpService, KeepAlive, Request, Response,
 };
-use actix_rt::net::{TcpStream, ServiceStream};
+use actix_rt::net::{ServiceStream, TcpStream};
 use actix_rt::{ActixRtFactory, RuntimeFactory};
 use actix_server::{Server, ServerBuilder, SingleThreadServerBuilder};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
@@ -310,26 +310,26 @@ where
         St: ServiceStream,
         A: net::ToSocketAddrs,
     {
-        let cfg = self.config.clone();
-        let factory = self.factory.clone();
-        let on_connect_fn = self.on_connect_fn.clone();
+        for addr in addrs.to_socket_addrs()?.collect::<Vec<_>>().into_iter() {
+            let cfg = self.config.clone();
+            let factory = self.factory.clone();
+            let on_connect_fn = self.on_connect_fn.clone();
 
-        let addr = addrs.to_socket_addrs()?.collect::<Vec<_>>().pop().unwrap();
-
-        self.builder =
-            self.builder
-                .bind::<_, _, _, St>("actix-web-service", addr, move || {
+            self.builder = self.builder.bind::<_, _, _, St>(
+                format!("actix-web-service-{:?}", addr),
+                addr,
+                move || {
                     let c = cfg.lock().unwrap();
                     let cfg = AppConfig::new(
                         false,
                         addr,
-                        c.host.clone().unwrap_or("host".into()),
+                        c.host.clone().unwrap_or_else(|| format!("{}", addr)),
                     );
 
                     let svc = HttpService::build()
                         .keep_alive(c.keep_alive)
-                        .client_timeout(c.client_timeout);
-                    // .local_addr(addr);
+                        .client_timeout(c.client_timeout)
+                        .local_addr(addr);
 
                     let svc = if let Some(handler) = on_connect_fn.clone() {
                         svc.on_connect_ext(move |io, ext: _| {
@@ -341,7 +341,10 @@ where
 
                     svc.finish(map_config(factory(), move |_| cfg.clone()))
                         .tcp()
-                })?;
+                },
+            )?;
+        }
+
         Ok(self)
     }
 
@@ -469,84 +472,69 @@ where
     /// This method sets alpn protocols to "h2" and "http/1.1"
     pub fn bind_openssl_with<St, A>(
         mut self,
-        addr: A,
+        addrs: A,
         builder: SslAcceptorBuilder,
     ) -> io::Result<Self>
     where
         St: ServiceStream,
         A: net::ToSocketAddrs,
     {
-        let sockets = self.bind2(addr)?;
         let acceptor = openssl_acceptor(builder)?;
 
-        for lst in sockets {
-            self = self.listen_ssl_inner::<St>(lst, acceptor.clone())?;
+        for addr in addrs.to_socket_addrs()?.collect::<Vec<_>>().into_iter() {
+            let cfg = self.config.clone();
+            let factory = self.factory.clone();
+            let on_connect_fn = self.on_connect_fn.clone();
+
+            let acceptor = acceptor.clone();
+
+            self.builder = self.builder.bind::<_, _, _, St>(
+                format!("actix-web-service-{:?}", addr),
+                addr,
+                move || {
+                    let c = cfg.lock().unwrap();
+                    let cfg = AppConfig::new(
+                        true,
+                        addr,
+                        c.host.clone().unwrap_or_else(|| format!("{}", addr)),
+                    );
+
+                    let svc = HttpService::build()
+                        .keep_alive(c.keep_alive)
+                        .client_timeout(c.client_timeout)
+                        .client_disconnect(c.client_shutdown);
+
+                    let svc = if let Some(handler) = on_connect_fn.clone() {
+                        svc.on_connect_ext(move |io: &_, ext: _| {
+                            (&*handler)(io as &dyn Any, ext)
+                        })
+                    } else {
+                        svc
+                    };
+
+                    svc.finish(map_config(factory(), move |_| cfg.clone()))
+                        .openssl(acceptor.clone())
+                }
+            )?;
         }
+
         Ok(self)
     }
 
-    /// Use listener for accepting incoming tls connection requests with a custom tcp stream type.
-    ///
-    /// This method sets alpn protocols to "h2" and "http/1.1"
-    pub fn listen_openssl<St>(
-        self,
-        lst: net::TcpListener,
-        builder: SslAcceptorBuilder,
-    ) -> io::Result<Self>
-    where
-        St: ServiceStream,
-    {
-        self.listen_ssl_inner::<St>(lst, openssl_acceptor(builder)?)
-    }
+    // /// Use listener for accepting incoming tls connection requests with a custom tcp stream type.
+    // ///
+    // /// This method sets alpn protocols to "h2" and "http/1.1"
+    // pub fn listen_openssl<St>(
+    //     self,
+    //     lst: net::TcpListener,
+    //     builder: SslAcceptorBuilder,
+    // ) -> io::Result<Self>
+    // where
+    //     St: ServiceStream,
+    // {
+    //     self.listen_ssl_inner::<St>(lst, openssl_acceptor(builder)?)
+    // }
 
-    fn listen_ssl_inner<St>(
-        mut self,
-        lst: net::TcpListener,
-        acceptor: SslAcceptor,
-    ) -> io::Result<Self>
-    where
-        St: ServiceStream,
-    {
-        let factory = self.factory.clone();
-        let cfg = self.config.clone();
-        let addr = lst.local_addr().unwrap();
-        self.sockets.push(Socket {
-            addr,
-            scheme: "https",
-        });
-
-        let on_connect_fn = self.on_connect_fn.clone();
-
-        self.builder = self.builder.listen::<_, _, St>(
-            format!("actix-web-service-{}", addr),
-            lst,
-            move || {
-                let c = cfg.lock().unwrap();
-                let cfg = AppConfig::new(
-                    true,
-                    addr,
-                    c.host.clone().unwrap_or_else(|| format!("{}", addr)),
-                );
-
-                let svc = HttpService::build()
-                    .keep_alive(c.keep_alive)
-                    .client_timeout(c.client_timeout)
-                    .client_disconnect(c.client_shutdown);
-
-                let svc = if let Some(handler) = on_connect_fn.clone() {
-                    svc.on_connect_ext(move |io: &_, ext: _| {
-                        (&*handler)(io as &dyn Any, ext)
-                    })
-                } else {
-                    svc
-                };
-
-                svc.finish(map_config(factory(), move |_| cfg.clone()))
-                    .openssl(acceptor.clone())
-            },
-        )?;
-        Ok(self)
-    }
 }
 
 #[cfg(feature = "rustls")]
@@ -578,82 +566,67 @@ where
     /// This method sets alpn protocols to "h2" and "http/1.1"
     pub fn bind_rustls_with<St, A>(
         mut self,
-        addr: A,
+        addrs: A,
         config: RustlsServerConfig,
     ) -> io::Result<Self>
     where
         St: ServiceStream,
         A: net::ToSocketAddrs,
     {
-        let sockets = self.bind2(addr)?;
-        for lst in sockets {
-            self = self.listen_rustls_inner::<St>(lst, config.clone())?;
+        for addr in addrs.to_socket_addrs()?.collect::<Vec<_>>().into_iter() {
+            let factory = self.factory.clone();
+            let cfg = self.config.clone();
+            let on_connect_fn = self.on_connect_fn.clone();
+
+            let config = config.clone();
+
+            self.builder = self.builder.bind::<_, _, _, St>(
+                format!("actix-web-service-{}", addr),
+                addr,
+                move || {
+                    let c = cfg.lock().unwrap();
+                    let cfg = AppConfig::new(
+                        true,
+                        addr,
+                        c.host.clone().unwrap_or_else(|| format!("{}", addr)),
+                    );
+
+                    let svc = HttpService::build()
+                        .keep_alive(c.keep_alive)
+                        .client_timeout(c.client_timeout)
+                        .client_disconnect(c.client_shutdown);
+
+                    let svc = if let Some(handler) = on_connect_fn.clone() {
+                        svc.on_connect_ext(move |io: &_, ext: _| {
+                            (handler)(io as &dyn Any, ext)
+                        })
+                    } else {
+                        svc
+                    };
+
+                    svc.finish(map_config(factory(), move |_| cfg.clone()))
+                        .rustls(config)
+                },
+            )?;
         }
+
         Ok(self)
     }
 
-    /// Use listener for accepting incoming tls connection requests
-    ///
-    /// This method sets alpn protocols to "h2" and "http/1.1"
-    pub fn listen_rustls<St>(
-        self,
-        lst: net::TcpListener,
-        config: RustlsServerConfig,
-    ) -> io::Result<Self>
-    where
-        St: ServiceStream,
-    {
-        self.listen_rustls_inner::<St>(lst, config)
-    }
+    // /// Use listener for accepting incoming tls connection requests
+    // ///
+    // /// This method sets alpn protocols to "h2" and "http/1.1"
+    // pub fn listen_rustls<St>(
+    //     self,
+    //     lst: net::TcpListener,
+    //     config: RustlsServerConfig,
+    // ) -> io::Result<Self>
+    // where
+    //     St: ServiceStream,
+    // {
+    //     self.listen_rustls_inner::<St>(lst, config)
+    // }
 
-    fn listen_rustls_inner<St>(
-        mut self,
-        lst: net::TcpListener,
-        config: RustlsServerConfig,
-    ) -> io::Result<Self>
-    where
-        St: ServiceStream,
-    {
-        let factory = self.factory.clone();
-        let cfg = self.config.clone();
-        let addr = lst.local_addr().unwrap();
-        self.sockets.push(Socket {
-            addr,
-            scheme: "https",
-        });
-
-        let on_connect_fn = self.on_connect_fn.clone();
-
-        self.builder = self.builder.listen::<_, _, St>(
-            format!("actix-web-service-{}", addr),
-            lst,
-            move || {
-                let c = cfg.lock().unwrap();
-                let cfg = AppConfig::new(
-                    true,
-                    addr,
-                    c.host.clone().unwrap_or_else(|| format!("{}", addr)),
-                );
-
-                let svc = HttpService::build()
-                    .keep_alive(c.keep_alive)
-                    .client_timeout(c.client_timeout)
-                    .client_disconnect(c.client_shutdown);
-
-                let svc = if let Some(handler) = on_connect_fn.clone() {
-                    svc.on_connect_ext(move |io: &_, ext: _| {
-                        (handler)(io as &dyn Any, ext)
-                    })
-                } else {
-                    svc
-                };
-
-                svc.finish(map_config(factory(), move |_| cfg.clone()))
-                    .rustls(config.clone())
-            },
-        )?;
-        Ok(self)
-    }
 }
 
 #[cfg(feature = "openssl")]

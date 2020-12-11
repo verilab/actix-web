@@ -6,8 +6,8 @@ use std::time::Instant;
 use std::{fmt, io, net};
 
 use actix_codec::{AsyncRead, Decoder, Encoder, Framed, FramedParts};
-use actix_rt::{RuntimeService, SleepService};
 use actix_rt::net::ServiceStream;
+use actix_rt::{RuntimeService, SleepService};
 use actix_service::Service;
 use bitflags::bitflags;
 use bytes::{Buf, BytesMut};

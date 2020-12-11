@@ -139,12 +139,12 @@ mod openssl {
                     .map_err(TlsError::Tls)
                     .map_init_err(|_| panic!()),
             )
-            .and_then(fn_factory(|| {
-                ready::<Result<_, S::InitError>>(fn_service(|io: SslStream<T>| {
-                    let peer_addr = io.peer_addr();
-                    ready(Ok((io, peer_addr)))
-                }))
-            }))
+            .and_then(fn_factory(||
+               ready(Ok(fn_service(|io: SslStream<T>| {
+                   let peer_addr = io.peer_addr();
+                   ready(Ok((io, peer_addr)))
+               })))
+            ))
             .and_then(self.map_err(TlsError::Service))
         }
     }
@@ -186,10 +186,10 @@ mod rustls {
                     .map_init_err(|_| panic!()),
             )
             .and_then(fn_factory(|| {
-                ok::<_, S::InitError>(fn_service(|io: TlsStream<T>| {
+                ready(Ok(fn_service(|io: TlsStream<T>| {
                     let peer_addr = io.peer_addr();
-                    ok((io, peer_addr))
-                }))
+                    ready(Ok((io, peer_addr)))
+                })))
             }))
             .and_then(self.map_err(TlsError::Service))
         }

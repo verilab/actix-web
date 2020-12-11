@@ -1,6 +1,6 @@
+use std::future::Ready;
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
-use std::future::Ready;
 
 use actix_codec::Framed;
 use actix_rt::net::ServiceStream;

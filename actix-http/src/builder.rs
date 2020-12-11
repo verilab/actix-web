@@ -3,7 +3,7 @@ use std::rc::Rc;
 use std::{fmt, net};
 
 use actix_codec::Framed;
-use actix_server::ServiceStream;
+use actix_rt::net::ServiceStream;
 use actix_service::{IntoServiceFactory, Service, ServiceFactory};
 
 use crate::body::MessageBody;

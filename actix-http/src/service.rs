@@ -4,7 +4,7 @@ use std::task::{Context, Poll};
 use std::{fmt, net, rc::Rc};
 
 use actix_codec::Framed;
-use actix_server::ServiceStream;
+use actix_rt::net::ServiceStream;
 use actix_service::{pipeline_factory, IntoServiceFactory, Service, ServiceFactory};
 use bytes::Bytes;
 use futures_core::{ready, Future};

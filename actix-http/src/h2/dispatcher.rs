@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 
 use actix_rt::{RuntimeService, SleepService};
-use actix_server::ServiceStream;
+use actix_rt::net::ServiceStream;
 use actix_service::Service;
 use bytes::{Bytes, BytesMut};
 use h2::server::{Connection, SendResponse};

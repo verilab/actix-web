@@ -9,9 +9,9 @@ use std::{
 use actix_http::{
     body::MessageBody, Error, Extensions, HttpService, KeepAlive, Request, Response,
 };
-use actix_rt::net::TcpStream;
+use actix_rt::net::{TcpStream, ServiceStream, IntoStream};
 use actix_rt::{ActixRtFactory, RuntimeFactory};
-use actix_server::{Server, ServerBuilder, ServiceStream, SingleThreadServerBuilder};
+use actix_server::{Server, ServerBuilder, SingleThreadServerBuilder};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 
 #[cfg(unix)]
@@ -27,6 +27,7 @@ use actix_tls::openssl::{AlpnError, SslAcceptor, SslAcceptorBuilder};
 use actix_tls::rustls::ServerConfig as RustlsServerConfig;
 
 use crate::config::AppConfig;
+use actix_rt::stream::Stream;
 
 struct Socket {
     scheme: &'static str,
@@ -204,8 +205,8 @@ where
     /// limit the global TLS CPU usage.
     ///
     /// By default max connections is set to a 256.
-    pub fn max_connection_rate(self, num: usize) -> Self {
-        actix_tls::max_concurrent_tls_connect(num);
+    pub fn max_connection_rate(mut self, num: usize) -> Self {
+        self.builder = self.builder.maxconn_tls(num);
         self
     }
 
@@ -308,6 +309,7 @@ where
     pub fn bind_with<St, A>(mut self, addrs: A) -> io::Result<Self>
     where
         St: ServiceStream,
+        <St::Listener as Stream>::Item: IntoStream<Result<St, io::Error>>,
         A: net::ToSocketAddrs,
     {
         let cfg = self.config.clone();
@@ -397,6 +399,7 @@ where
     pub fn bind_uds_with<St, A>(mut self, addr: A) -> io::Result<Self>
     where
         St: ServiceStream,
+        <St::Listener as Stream>::Item: IntoStream<Result<St, io::Error>>,
         A: AsRef<std::path::Path>,
     {
         let cfg = self.config.clone();

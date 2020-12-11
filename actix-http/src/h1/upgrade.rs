@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
+use std::future::Ready;
 
 use actix_codec::Framed;
-use actix_server::ServiceStream;
+use actix_rt::net::ServiceStream;
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::Ready;
 
 use crate::error::Error;
 use crate::h1::Codec;

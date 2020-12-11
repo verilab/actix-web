@@ -7,8 +7,7 @@ use std::time::Duration;
 use actix_http::client::{Connect as HttpConnect, ConnectError, Connection, Connector};
 use actix_http::http::{self, header, Error as HttpError, HeaderMap, HeaderName};
 use actix_service::Service;
-use actix_rt::net::TcpStream;
-use actix_server::ServiceStream;
+use actix_rt::net::{TcpStream, ServiceStream};
 
 use crate::connect::{Connect, ConnectorWrapper};
 use crate::{Client, ClientConfig};

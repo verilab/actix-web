@@ -1,17 +1,16 @@
-use std::future::Future;
+use std::future::{ready, Future};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::{net, rc::Rc};
 
-use actix_server::ServiceStream;
+use actix_rt::net::ServiceStream;
 use actix_service::{
     fn_factory, fn_service, pipeline_factory, IntoServiceFactory, Service,
     ServiceFactory,
 };
 use bytes::Bytes;
 use futures_core::ready;
-use futures_util::future::ok;
 use h2::server::{self, Handshake};
 use log::error;
 
@@ -100,7 +99,7 @@ where
         pipeline_factory(fn_factory(|| async {
             Ok::<_, S::InitError>(fn_service(|io: T| {
                 let peer_addr = io.peer_addr();
-                ok::<_, DispatchError>((io, peer_addr))
+                ready::<Result<_, DispatchError>>(Ok((io, peer_addr)))
             }))
         }))
         .and_then(self)
@@ -141,9 +140,9 @@ mod openssl {
                     .map_init_err(|_| panic!()),
             )
             .and_then(fn_factory(|| {
-                ok::<_, S::InitError>(fn_service(|io: SslStream<T>| {
+                ready::<Result<_, S::InitError>>(fn_service(|io: SslStream<T>| {
                     let peer_addr = io.peer_addr();
-                    ok((io, peer_addr))
+                    ready(Ok((io, peer_addr)))
                 }))
             }))
             .and_then(self.map_err(TlsError::Service))

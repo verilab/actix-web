@@ -139,12 +139,12 @@ mod openssl {
                     .map_err(TlsError::Tls)
                     .map_init_err(|_| panic!()),
             )
-            .and_then(fn_factory(||
-               ready(Ok(fn_service(|io: SslStream<T>| {
-                   let peer_addr = io.peer_addr();
-                   ready(Ok((io, peer_addr)))
-               })))
-            ))
+            .and_then(fn_factory(|| {
+                ready(Ok(fn_service(|io: SslStream<T>| {
+                    let peer_addr = io.peer_addr();
+                    ready(Ok((io, peer_addr)))
+                })))
+            }))
             .and_then(self.map_err(TlsError::Service))
         }
     }

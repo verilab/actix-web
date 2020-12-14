@@ -10,7 +10,6 @@ use actix_http::{
     body::MessageBody, Error, Extensions, HttpService, KeepAlive, Request, Response,
 };
 use actix_rt::net::{ServiceStream, TcpStream};
-use actix_rt::{ActixRtFactory, RuntimeFactory};
 use actix_server::{Server, ServerBuilder, SingleThreadServerBuilder};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 
@@ -57,7 +56,7 @@ struct Config {
 ///         .await
 /// }
 /// ```
-pub struct HttpServer<F, I, S, B, BD = SingleThreadServerBuilder, RT = ActixRtFactory>
+pub struct HttpServer<F, I, S, B, BD = SingleThreadServerBuilder>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -66,8 +65,7 @@ where
     S::InitError: fmt::Debug,
     S::Response: Into<Response<B>>,
     B: MessageBody,
-    BD: ServerBuilder<RT>,
-    RT: RuntimeFactory,
+    BD: ServerBuilder,
 {
     pub(super) factory: F,
     config: Arc<Mutex<Config>>,
@@ -75,7 +73,7 @@ where
     sockets: Vec<Socket>,
     builder: BD,
     on_connect_fn: Option<Arc<dyn Fn(&dyn Any, &mut Extensions) + Send + Sync>>,
-    _t: PhantomData<(S, B, RT)>,
+    _t: PhantomData<(S, B)>,
 }
 
 impl<F, I, S, B> HttpServer<F, I, S, B>
@@ -108,7 +106,7 @@ where
     }
 }
 
-impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
+impl<F, I, S, B, BD> HttpServer<F, I, S, B, BD>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -118,13 +116,11 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    BD: ServerBuilder<RT>,
-    RT: RuntimeFactory,
+    BD: ServerBuilder,
 {
-    pub fn builder<BD2, RT2>(self, builder: BD2) -> HttpServer<F, I, S, B, BD2, RT2>
+    pub fn builder<BD2>(self, builder: BD2) -> HttpServer<F, I, S, B, BD2>
     where
-        BD2: ServerBuilder<RT2>,
-        RT2: RuntimeFactory,
+        BD2: ServerBuilder,
     {
         HttpServer {
             factory: self.factory,
@@ -369,13 +365,13 @@ where
     ///         .await
     /// }
     /// ```
-    pub fn run(self) -> Server<RT::Runtime> {
+    pub fn run(self) -> Server {
         self.builder.start()
     }
 }
 
 #[cfg(unix)]
-impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
+impl<F, I, S, B, BD> HttpServer<F, I, S, B, BD>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -385,8 +381,7 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    BD: ServerBuilder<RT>,
-    RT: RuntimeFactory,
+    BD: ServerBuilder,
 {
     /// Start listening for incoming unix domain connections.
     pub fn bind_uds<A>(self, addr: A) -> io::Result<Self>
@@ -440,7 +435,7 @@ where
 }
 
 #[cfg(feature = "openssl")]
-impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
+impl<F, I, S, B, BD> HttpServer<F, I, S, B, BD>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -450,8 +445,7 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    BD: ServerBuilder<RT>,
-    RT: RuntimeFactory,
+    BD: ServerBuilder,
 {
     /// Start listening for incoming tls connections.
     ///
@@ -514,7 +508,7 @@ where
 
                     svc.finish(map_config(factory(), move |_| cfg.clone()))
                         .openssl(acceptor.clone())
-                }
+                },
             )?;
         }
 
@@ -534,11 +528,10 @@ where
     // {
     //     self.listen_ssl_inner::<St>(lst, openssl_acceptor(builder)?)
     // }
-
 }
 
 #[cfg(feature = "rustls")]
-impl<F, I, S, B, BD, RT> HttpServer<F, I, S, B, BD, RT>
+impl<F, I, S, B, BD> HttpServer<F, I, S, B, BD>
 where
     F: Fn() -> I + Send + Clone + 'static,
     I: IntoServiceFactory<S>,
@@ -548,8 +541,7 @@ where
     S::Response: Into<Response<B>> + 'static,
     <S::Service as Service>::Future: 'static,
     B: MessageBody + 'static,
-    BD: ServerBuilder<RT>,
-    RT: RuntimeFactory,
+    BD: ServerBuilder,
 {
     /// Start listening for incoming tls connections.
     ///
@@ -626,7 +618,6 @@ where
     // {
     //     self.listen_rustls_inner::<St>(lst, config)
     // }
-
 }
 
 #[cfg(feature = "openssl")]

@@ -5,12 +5,12 @@ use std::task::{Context, Poll};
 use std::time::Instant;
 use std::{fmt, io, net};
 
-use actix_codec::{AsyncRead, Decoder, Encoder, Framed, FramedParts};
+use actix_codec::{AsyncRead, Decoder, Encoder, Framed, FramedParts, ReadBuf};
 use actix_rt::net::ServiceStream;
 use actix_rt::{RuntimeService, SleepService};
 use actix_service::Service;
 use bitflags::bitflags;
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, BufMut, BytesMut};
 use log::{error, trace};
 use pin_project::pin_project;
 
@@ -30,6 +30,7 @@ use crate::{
 use super::codec::Codec;
 use super::payload::{Payload, PayloadSender, PayloadStatus};
 use super::{Message, MessageType};
+use std::mem::MaybeUninit;
 
 const LW_BUFFER_SIZE: usize = 4096;
 const HW_BUFFER_SIZE: usize = 32_768;
@@ -920,7 +921,35 @@ fn read<T>(
 where
     T: AsyncRead + Unpin,
 {
-    actix_codec::poll_read_buf(Pin::new(io), cx, buf)
+    if !buf.has_remaining_mut() {
+        return Poll::Ready(Ok(0));
+    }
+
+    println!(
+        "buf                                                  remaining {}",
+        buf.remaining_mut()
+    );
+    let n = {
+        let dst = buf.bytes_mut();
+        let dst = unsafe { &mut *(dst as *mut _ as *mut [MaybeUninit<u8>]) };
+        let mut buf = ReadBuf::uninit(dst);
+        let ptr = buf.filled().as_ptr();
+        futures_util::ready!(Pin::new(io).poll_read(cx, &mut buf)?);
+
+        // Ensure the pointer does not change from under us
+        assert_eq!(ptr, buf.filled().as_ptr());
+        buf.filled().len()
+    };
+
+    println!("?????????????");
+
+    // Safety: This is guaranteed to be the number of initialized (and read)
+    // bytes due to the invariants provided by `ReadBuf::filled`.
+    unsafe {
+        buf.advance_mut(n);
+    }
+
+    Poll::Ready(Ok(n))
 }
 
 #[cfg(test)]
@@ -934,37 +963,37 @@ mod tests {
     use crate::test::TestBuffer;
 
     // FIXME: fix this test.
-    // #[actix_rt::test]
-    // async fn test_req_parse_err() {
-    //     lazy(|cx| {
-    //         let buf = TestBuffer::new("GET /test HTTP/1\r\n\r\n");
-    //
-    //         let mut h1 = Dispatcher::<_, _, _, _, UpgradeHandler<TestBuffer>>::new(
-    //             buf,
-    //             ServiceConfig::default(),
-    //             CloneableService::new(
-    //                 (|_| ok::<_, Error>(Response::Ok().finish())).into_service(),
-    //             ),
-    //             CloneableService::new(ExpectHandler),
-    //             None,
-    //             None,
-    //             Extensions::new(),
-    //             None,
-    //         );
-    //
-    //         match Pin::new(&mut h1).poll(cx) {
-    //             Poll::Pending => panic!(),
-    //             Poll::Ready(res) => assert!(res.is_err()),
-    //         }
-    //
-    //         if let DispatcherState::Normal(ref mut inner) = h1.inner {
-    //             assert!(inner.flags.contains(Flags::READ_DISCONNECT));
-    //             assert_eq!(
-    //                 &inner.io.take().unwrap().write_buf[..26],
-    //                 b"HTTP/1.1 400 Bad Request\r\n"
-    //             );
-    //         }
-    //     })
-    //     .await;
-    // }
+    #[actix_rt::test]
+    async fn test_req_parse_err() {
+        lazy(|cx| {
+            let buf = TestBuffer::new("GET /test HTTP/1\r\n\r\n");
+
+            let mut h1 = Dispatcher::<_, _, _, _, UpgradeHandler<TestBuffer>>::new(
+                buf,
+                ServiceConfig::default(),
+                CloneableService::new(
+                    (|_| ok::<_, Error>(Response::Ok().finish())).into_service(),
+                ),
+                CloneableService::new(ExpectHandler),
+                None,
+                None,
+                Extensions::new(),
+                None,
+            );
+
+            match Pin::new(&mut h1).poll(cx) {
+                Poll::Pending => panic!(),
+                Poll::Ready(res) => assert!(res.is_err()),
+            }
+
+            if let DispatcherState::Normal(ref mut inner) = h1.inner {
+                assert!(inner.flags.contains(Flags::READ_DISCONNECT));
+                assert_eq!(
+                    &inner.io.take().unwrap().write_buf[..26],
+                    b"HTTP/1.1 400 Bad Request\r\n"
+                );
+            }
+        })
+        .await;
+    }
 }

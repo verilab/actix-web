@@ -12,7 +12,7 @@ use crate::body::BodySize;
 use crate::config::ServiceConfig;
 use crate::error::{ParseError, PayloadError};
 use crate::message::{ConnectionType, RequestHeadType, ResponseHead};
-use actix_rt::RuntimeService;
+use actix_rt::{ActixRuntime, RuntimeService};
 
 bitflags! {
     struct Flags: u8 {
@@ -23,7 +23,7 @@ bitflags! {
 }
 
 /// HTTP/1 Codec
-pub struct ClientCodec<RT> {
+pub struct ClientCodec<RT: RuntimeService = ActixRuntime> {
     inner: ClientCodecInner<RT>,
 }
 
@@ -101,7 +101,7 @@ impl<RT: RuntimeService> ClientCodec<RT> {
     }
 }
 
-impl<RT> ClientPayloadCodec<RT> {
+impl<RT: RuntimeService> ClientPayloadCodec<RT> {
     /// Check if last response is keep-alive
     pub fn keepalive(&self) -> bool {
         self.inner.ctype == ConnectionType::KeepAlive
@@ -113,7 +113,7 @@ impl<RT> ClientPayloadCodec<RT> {
     }
 }
 
-impl<RT> Decoder for ClientCodec<RT> {
+impl<RT: RuntimeService> Decoder for ClientCodec<RT> {
     type Item = ResponseHead;
     type Error = ParseError;
 

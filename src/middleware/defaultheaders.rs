@@ -167,7 +167,7 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_default_headers() {
-        let mut mw = DefaultHeaders::new()
+        let mw = DefaultHeaders::new()
             .header(CONTENT_TYPE, "0001")
             .new_transform(ok_service())
             .await
@@ -182,7 +182,7 @@ mod tests {
             ok(req
                 .into_response(HttpResponse::Ok().header(CONTENT_TYPE, "0002").finish()))
         };
-        let mut mw = DefaultHeaders::new()
+        let mw = DefaultHeaders::new()
             .header(CONTENT_TYPE, "0001")
             .new_transform(srv.into_service())
             .await
@@ -195,7 +195,7 @@ mod tests {
     async fn test_content_type() {
         let srv =
             |req: ServiceRequest| ok(req.into_response(HttpResponse::Ok().finish()));
-        let mut mw = DefaultHeaders::new()
+        let mw = DefaultHeaders::new()
             .content_type()
             .new_transform(srv.into_service())
             .await

@@ -472,7 +472,7 @@ mod tests {
         let data = Arc::new(AtomicBool::new(false));
 
         {
-            let mut app = init_service(
+            let app = init_service(
                 App::new()
                     .data(DropData(data.clone()))
                     .service(web::resource("/test").to(HttpResponse::Ok)),

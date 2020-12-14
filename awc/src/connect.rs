@@ -13,13 +13,12 @@ use actix_http::h1::ClientCodec;
 use actix_http::http::HeaderMap;
 use actix_http::{RequestHead, RequestHeadType, ResponseHead};
 use actix_service::Service;
-use actix_rt::RuntimeService;
 
 use crate::response::ClientResponse;
 
 pub(crate) struct ConnectorWrapper<T>(pub T);
 
-pub(crate) trait Connect<RT: RuntimeService> {
+pub(crate) trait Connect {
     fn send_request(
         &mut self,
         head: RequestHead,
@@ -44,7 +43,7 @@ pub(crate) trait Connect<RT: RuntimeService> {
         Box<
             dyn Future<
                 Output = Result<
-                    (ResponseHead, Framed<BoxedSocket, ClientCodec<RT>>),
+                    (ResponseHead, Framed<BoxedSocket, ClientCodec>),
                     SendRequestError,
                 >,
             >,
@@ -61,7 +60,7 @@ pub(crate) trait Connect<RT: RuntimeService> {
         Box<
             dyn Future<
                 Output = Result<
-                    (ResponseHead, Framed<BoxedSocket, ClientCodec<RT>>),
+                    (ResponseHead, Framed<BoxedSocket, ClientCodec>),
                     SendRequestError,
                 >,
             >,
@@ -69,7 +68,7 @@ pub(crate) trait Connect<RT: RuntimeService> {
     >;
 }
 
-impl<RT, T> Connect<RT> for ConnectorWrapper<T>
+impl<T> Connect for ConnectorWrapper<T>
 where
     T: Service<Request = ClientConnect, Error = ConnectError>,
     T::Response: Connection,
@@ -134,7 +133,7 @@ where
         Box<
             dyn Future<
                 Output = Result<
-                    (ResponseHead, Framed<BoxedSocket, ClientCodec<RT>>),
+                    (ResponseHead, Framed<BoxedSocket, ClientCodec>),
                     SendRequestError,
                 >,
             >,
@@ -167,7 +166,7 @@ where
         Box<
             dyn Future<
                 Output = Result<
-                    (ResponseHead, Framed<BoxedSocket, ClientCodec<RT>>),
+                    (ResponseHead, Framed<BoxedSocket, ClientCodec>),
                     SendRequestError,
                 >,
             >,

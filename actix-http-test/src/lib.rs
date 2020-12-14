@@ -9,7 +9,7 @@ use std::{net, thread, time};
 
 use actix_codec::{AsyncRead, AsyncWrite, Framed};
 use actix_rt::{net::TcpStream, System};
-use actix_server::{Server, ServiceFactory};
+use actix_server::{ServerBuilder, ServiceFactorySend, SingleThreadServer};
 use awc::{error::PayloadError, ws, Client, ClientRequest, ClientResponse, Connector};
 use bytes::Bytes;
 use futures_core::stream::Stream;
@@ -48,13 +48,13 @@ pub use actix_testing::*;
 ///     assert!(response.status().is_success());
 /// }
 /// ```
-pub async fn test_server<F: ServiceFactory<TcpStream>>(factory: F) -> TestServer {
+pub async fn test_server<F: ServiceFactorySend<TcpStream>>(factory: F) -> TestServer {
     let tcp = net::TcpListener::bind("127.0.0.1:0").unwrap();
     test_server_with_addr(tcp, factory).await
 }
 
 /// Start [`test server`](./fn.test_server.html) on a concrete Address
-pub async fn test_server_with_addr<F: ServiceFactory<TcpStream>>(
+pub async fn test_server_with_addr<F: ServiceFactorySend<TcpStream>>(
     tcp: net::TcpListener,
     factory: F,
 ) -> TestServer {
@@ -65,7 +65,7 @@ pub async fn test_server_with_addr<F: ServiceFactory<TcpStream>>(
         let sys = System::new("actix-test-server");
         let local_addr = tcp.local_addr().unwrap();
 
-        Server::build()
+        SingleThreadServer::build()
             .listen("test", tcp, factory)?
             .workers(1)
             .disable_signals()

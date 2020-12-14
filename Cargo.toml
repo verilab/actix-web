@@ -28,7 +28,7 @@ path = "src/lib.rs"
 [workspace]
 members = [
   ".",
-#  "awc",
+  "awc",
   "actix-http",
   "actix-files",
   "actix-multipart",
@@ -86,7 +86,7 @@ actix-tls = "2.0.0"
 
 actix-web-codegen = "0.4.0"
 actix-http = "2.2.0"
-#awc = { version = "2.0.3", default-features = false }
+awc = { version = "2.0.3", default-features = false }
 
 bytes = "0.6"
 derive_more = "0.99.5"
@@ -136,9 +136,12 @@ awc = { path = "awc" }
 # FIXME: remove these override
 actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+#actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-rt = { path = "../actix-net-fs/actix-rt" }
+#actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-server = { path = "../actix-net-fs/actix-server" }
+#actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-service = { path = "../actix-net-fs/actix-service" }
 actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }

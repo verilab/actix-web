@@ -17,6 +17,7 @@ use crate::payload::Payload;
 use super::error::SendRequestError;
 use super::pool::{Acquired, Protocol};
 use super::{h1proto, h2proto};
+use actix_rt::ActixRuntime;
 
 pub(crate) enum ConnectionType<Io> {
     H1(Io),
@@ -37,7 +38,10 @@ pub trait Connection {
     ) -> Self::Future;
 
     type TunnelFuture: Future<
-        Output = Result<(ResponseHead, Framed<Self::Io, ClientCodec>), SendRequestError>,
+        Output = Result<
+            (ResponseHead, Framed<Self::Io, ClientCodec<ActixRuntime>>),
+            SendRequestError,
+        >,
     >;
 
     /// Send request, returns Response and Framed
@@ -127,9 +131,17 @@ where
     type TunnelFuture = Either<
         LocalBoxFuture<
             'static,
-            Result<(ResponseHead, Framed<Self::Io, ClientCodec>), SendRequestError>,
+            Result<
+                (ResponseHead, Framed<Self::Io, ClientCodec<ActixRuntime>>),
+                SendRequestError,
+            >,
         >,
-        Ready<Result<(ResponseHead, Framed<Self::Io, ClientCodec>), SendRequestError>>,
+        Ready<
+            Result<
+                (ResponseHead, Framed<Self::Io, ClientCodec<ActixRuntime>>),
+                SendRequestError,
+            >,
+        >,
     >;
 
     /// Send request, returns Response and Framed
@@ -187,7 +199,10 @@ where
 
     type TunnelFuture = LocalBoxFuture<
         'static,
-        Result<(ResponseHead, Framed<Self::Io, ClientCodec>), SendRequestError>,
+        Result<
+            (ResponseHead, Framed<Self::Io, ClientCodec<ActixRuntime>>),
+            SendRequestError,
+        >,
     >;
 
     /// Send request, returns Response and Framed

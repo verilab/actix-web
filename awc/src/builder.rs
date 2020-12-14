@@ -7,7 +7,6 @@ use std::time::Duration;
 use actix_http::client::{Connect as HttpConnect, ConnectError, Connection, Connector};
 use actix_http::http::{self, header, Error as HttpError, HeaderMap, HeaderName};
 use actix_service::Service;
-use actix_rt::net::{TcpStream, ServiceStream};
 
 use crate::connect::{Connect, ConnectorWrapper};
 use crate::{Client, ClientConfig};
@@ -16,7 +15,7 @@ use crate::{Client, ClientConfig};
 ///
 /// This type can be used to construct an instance of `Client` through a
 /// builder-like pattern.
-pub struct ClientBuilder<ST: ServiceStream = TcpStream> {
+pub struct ClientBuilder {
     default_headers: bool,
     allow_redirects: bool,
     max_redirects: usize,
@@ -25,7 +24,7 @@ pub struct ClientBuilder<ST: ServiceStream = TcpStream> {
     conn_window_size: Option<u32>,
     headers: HeaderMap,
     timeout: Option<Duration>,
-    connector: Option<RefCell<Box<dyn Connect<ST::Runtime>>>>,
+    connector: Option<RefCell<Box<dyn Connect>>>,
 }
 
 impl Default for ClientBuilder {
@@ -34,7 +33,7 @@ impl Default for ClientBuilder {
     }
 }
 
-impl<ST: ServiceStream> ClientBuilder<ST> {
+impl ClientBuilder {
     pub fn new() -> Self {
         ClientBuilder {
             default_headers: true,
@@ -169,7 +168,7 @@ impl<ST: ServiceStream> ClientBuilder<ST> {
     }
 
     /// Finish build process and create `Client` instance.
-    pub fn finish(self) -> Client<ST> {
+    pub fn finish(self) -> Client {
         let connector = if let Some(connector) = self.connector {
             connector
         } else {
@@ -184,7 +183,7 @@ impl<ST: ServiceStream> ClientBuilder<ST> {
                 connector = connector.initial_window_size(val)
             };
             RefCell::new(
-                Box::new(ConnectorWrapper(connector.finish())) as Box<dyn Connect<ST::Runtime>>
+                Box::new(ConnectorWrapper(connector.finish())) as Box<dyn Connect>
             )
         };
         let config = ClientConfig {

@@ -626,7 +626,7 @@ mod tests {
         };
         let logger = Logger::new("%% %{User-Agent}i %{X-Test}o %{HOME}e %D test");
 
-        let mut srv = logger.new_transform(srv.into_service()).await.unwrap();
+        let srv = logger.new_transform(srv.into_service()).await.unwrap();
 
         let req = TestRequest::with_header(
             header::USER_AGENT,
@@ -648,7 +648,7 @@ mod tests {
         let logger = Logger::new("%% %{User-Agent}i %{X-Test}o %{HOME}e %D test")
             .exclude_regex("\\w");
 
-        let mut srv = logger.new_transform(srv.into_service()).await.unwrap();
+        let srv = logger.new_transform(srv.into_service()).await.unwrap();
 
         let req = TestRequest::with_header(
             header::USER_AGENT,
@@ -818,7 +818,7 @@ mod tests {
                 captured.to_owned()
             });
 
-        let mut srv = logger.new_transform(test::ok_service()).await.unwrap();
+        let srv = logger.new_transform(test::ok_service()).await.unwrap();
 
         let req = TestRequest::default().to_srv_request();
         srv.call(req).await.unwrap();

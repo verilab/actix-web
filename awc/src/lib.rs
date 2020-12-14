@@ -102,8 +102,6 @@ pub use actix_http::{client::Connector, cookie, http};
 
 use actix_http::http::{Error as HttpError, HeaderMap, Method, Uri};
 use actix_http::RequestHead;
-use actix_rt::net::TcpStream;
-use actix_server::ServiceStream;
 
 mod builder;
 mod connect;
@@ -144,10 +142,10 @@ use self::connect::{Connect, ConnectorWrapper};
 /// }
 /// ```
 #[derive(Clone)]
-pub struct Client<ST: ServiceStream = TcpStream>(Rc<ClientConfig<ST::Runtime>>);
+pub struct Client(Rc<ClientConfig>);
 
-pub(crate) struct ClientConfig<RT> {
-    pub(crate) connector: RefCell<Box<dyn Connect<RT>>>,
+pub(crate) struct ClientConfig {
+    pub(crate) connector: RefCell<Box<dyn Connect>>,
     pub(crate) headers: HeaderMap,
     pub(crate) timeout: Option<Duration>,
 }
@@ -178,12 +176,12 @@ impl Client {
 
     /// Create `Client` builder with custom stream type.
     /// This function is equivalent of `ClientBuilder::new()`.
-    pub fn builder_with<ST>() -> ClientBuilder<ST> {
-        ClientBuilder::<ST>::new()
+    pub fn builder_with<ST>() -> ClientBuilder {
+        ClientBuilder::new()
     }
 }
 
-impl<ST> Client<ST> {
+impl Client {
     /// Construct HTTP request.
     pub fn request<U>(&self, method: Method, url: U) -> ClientRequest
     where

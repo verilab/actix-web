@@ -141,7 +141,7 @@ pub mod dev {
         Extensions, Payload, PayloadStream, RequestHead, ResponseHead,
     };
     pub use actix_router::{Path, ResourceDef, ResourcePath, Url};
-    pub use actix_server::Server;
+    pub use actix_server::SingleThreadServer;
     pub use actix_service::{Service, Transform};
 
     pub(crate) fn insert_slash(mut patterns: Vec<String>) -> Vec<String> {

@@ -10,7 +10,7 @@ use actix_http::{
     body::MessageBody, Error, Extensions, HttpService, KeepAlive, Request, Response,
 };
 use actix_rt::net::{ServiceStream, TcpStream};
-use actix_server::{Server, ServerBuilder, SingleThreadServerBuilder};
+use actix_server::{ServerBuilder, SingleThreadServerBuilder};
 use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 
 #[cfg(unix)]
@@ -365,7 +365,7 @@ where
     ///         .await
     /// }
     /// ```
-    pub fn run(self) -> Server {
+    pub fn run(self) -> BD::Server {
         self.builder.start()
     }
 }

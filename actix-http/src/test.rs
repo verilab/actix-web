@@ -15,6 +15,10 @@ use crate::header::HeaderMap;
 use crate::header::{Header, IntoHeaderValue};
 use crate::payload::Payload;
 use crate::Request;
+use actix_rt::net::{Counter, CounterGuard, IntoStream, ServiceStream, TcpStream};
+use actix_rt::ActixRuntime;
+use futures_core::Stream;
+use std::net::SocketAddr;
 
 /// Test `Request` builder
 ///
@@ -266,5 +270,36 @@ impl AsyncWrite for TestBuffer {
 
     fn poll_shutdown(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<io::Result<()>> {
         Poll::Ready(Ok(()))
+    }
+}
+
+impl ServiceStream for TestBuffer {
+    type Runtime = ActixRuntime;
+    type Listener = DummyListener;
+    type Item = TcpStream;
+    type Error = io::Error;
+
+    fn peer_addr(&self) -> Option<SocketAddr> {
+        unimplemented!()
+    }
+
+    fn counter(&self) -> Counter {
+        unimplemented!()
+    }
+}
+
+pub struct DummyListener;
+
+impl Stream for DummyListener {
+    type Item = Result<TcpStream, io::Error>;
+
+    fn poll_next(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        Poll::Pending
+    }
+}
+
+impl IntoStream<TestBuffer> for TcpStream {
+    fn into_stream(self, _: CounterGuard) -> TestBuffer {
+        unimplemented!()
     }
 }

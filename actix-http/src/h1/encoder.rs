@@ -573,6 +573,7 @@ mod tests {
     use super::*;
     use crate::http::header::{HeaderValue, CONTENT_TYPE};
     use crate::RequestHead;
+    use actix_rt::ActixRuntime;
 
     #[test]
     fn test_chunked_te() {
@@ -599,7 +600,7 @@ mod tests {
 
         let mut head = RequestHeadType::Owned(head);
 
-        let _ = head.encode_headers(
+        let _ = head.encode_headers::<ActixRuntime>(
             &mut bytes,
             Version::HTTP_11,
             BodySize::Empty,
@@ -613,7 +614,7 @@ mod tests {
         assert!(data.contains("Content-Type: plain/text\r\n"));
         assert!(data.contains("Date: date\r\n"));
 
-        let _ = head.encode_headers(
+        let _ = head.encode_headers::<ActixRuntime>(
             &mut bytes,
             Version::HTTP_11,
             BodySize::Stream,
@@ -635,7 +636,7 @@ mod tests {
             .append(CONTENT_TYPE, HeaderValue::from_static("xml"));
 
         let mut head = RequestHeadType::Owned(head);
-        let _ = head.encode_headers(
+        let _ = head.encode_headers::<ActixRuntime>(
             &mut bytes,
             Version::HTTP_11,
             BodySize::Stream,
@@ -669,7 +670,7 @@ mod tests {
 
         let mut head = RequestHeadType::Rc(Rc::new(head), Some(extra_headers));
 
-        let _ = head.encode_headers(
+        let _ = head.encode_headers::<ActixRuntime>(
             &mut bytes,
             Version::HTTP_11,
             BodySize::Empty,
@@ -695,7 +696,7 @@ mod tests {
         res.headers_mut()
             .insert(CONTENT_LENGTH, HeaderValue::from_static(&"0"));
 
-        let _ = res.encode_headers(
+        let _ = res.encode_headers::<ActixRuntime>(
             &mut bytes,
             Version::HTTP_11,
             BodySize::Stream,

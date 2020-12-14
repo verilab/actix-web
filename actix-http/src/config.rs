@@ -255,10 +255,7 @@ impl DateServiceInner {
     }
 }
 
-impl<RT> DateService<RT>
-where
-    RT: RuntimeService,
-{
+impl<RT: RuntimeService> DateService<RT> {
     fn new() -> Self {
         DateService(Rc::new(DateServiceInner::new()), PhantomData)
     }
@@ -290,12 +287,13 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use actix_rt::ActixRuntime;
 
     // Test modifying the date from within the closure
     // passed to `set_date`
     #[test]
     fn test_evil_date() {
-        let service = DateService::new();
+        let service = DateService::<ActixRuntime>::new();
         // Make sure that `check_date` doesn't try to spawn a task
         service.0.update();
         service.set_date(|_| service.0.reset());
@@ -308,7 +306,8 @@ mod tests {
 
     #[actix_rt::test]
     async fn test_date() {
-        let settings = ServiceConfig::new(KeepAlive::Os, 0, 0, false, None);
+        let settings =
+            ServiceConfig::<ActixRuntime>::new(KeepAlive::Os, 0, 0, false, None);
         let mut buf1 = BytesMut::with_capacity(DATE_VALUE_LENGTH + 10);
         settings.set_date(&mut buf1);
         let mut buf2 = BytesMut::with_capacity(DATE_VALUE_LENGTH + 10);

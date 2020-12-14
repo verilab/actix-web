@@ -1,7 +1,8 @@
 use std::{env, io};
 
 use actix_http::{Error, HttpService, Request, Response};
-use actix_server::Server;
+use actix_rt::net::TcpStream;
+use actix_server::{ServerBuilder, SingleThreadServer};
 use bytes::BytesMut;
 use futures_util::StreamExt;
 use http::header::HeaderValue;
@@ -12,8 +13,8 @@ async fn main() -> io::Result<()> {
     env::set_var("RUST_LOG", "echo=info");
     env_logger::init();
 
-    Server::build()
-        .bind("echo", "127.0.0.1:8080", || {
+    SingleThreadServer::build()
+        .bind::<_, _, _, TcpStream>("echo", "127.0.0.1:8080", || {
             HttpService::build()
                 .client_timeout(1000)
                 .client_disconnect(1000)
@@ -32,6 +33,6 @@ async fn main() -> io::Result<()> {
                 })
                 .tcp()
         })?
-        .run()
+        .run()?
         .await
 }

@@ -136,12 +136,9 @@ awc = { path = "awc" }
 # FIXME: remove these override
 actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-rt = { path = "../actix-net-fs/actix-rt" }
-#actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-server = { path = "../actix-net-fs/actix-server" }
-#actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-service = { path = "../actix-net-fs/actix-service" }
+actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }

@@ -62,14 +62,17 @@ pub async fn test_server_with_addr<F: ServiceFactorySend<TcpStream>>(
 
     // run server in separate thread
     thread::spawn(move || {
-        let sys = System::new("actix-test-server");
+        let mut sys = System::new("actix-test-server");
         let local_addr = tcp.local_addr().unwrap();
 
-        SingleThreadServer::build()
+        let srv = SingleThreadServer::build()
             .listen("test", tcp, factory)?
             .workers(1)
-            .disable_signals()
-            .start();
+            .disable_signals();
+
+        sys.spawn(async {
+            let _ = srv.start().await;
+        });
 
         tx.send((System::current(), local_addr)).unwrap();
         sys.run()

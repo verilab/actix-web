@@ -195,6 +195,7 @@ impl<T: RuntimeService> Encoder<Message<(Response<()>, BodySize)>> for Codec<T> 
 
 #[cfg(test)]
 mod tests {
+    use actix_rt::ActixRuntime;
     use bytes::BytesMut;
     use http::Method;
 
@@ -203,7 +204,7 @@ mod tests {
 
     #[test]
     fn test_http_request_chunked_payload_and_next_message() {
-        let mut codec = Codec::default();
+        let mut codec = Codec::<ActixRuntime>::default();
 
         let mut buf = BytesMut::from(
             "GET /test HTTP/1.1\r\n\

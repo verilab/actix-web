@@ -16,7 +16,6 @@ use futures_util::future;
 use futures_util::task::{Context, Poll};
 use futures_util::{SinkExt, StreamExt};
 
-// FIXME: fix this test
 struct WsService<T>(Arc<Mutex<(PhantomData<AtomicPtr<T>>, Cell<bool>)>>);
 
 impl<T> WsService<T> {

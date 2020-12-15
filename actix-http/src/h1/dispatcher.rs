@@ -933,7 +933,6 @@ mod tests {
     use crate::h1::{ExpectHandler, UpgradeHandler};
     use crate::test::TestBuffer;
 
-    // FIXME: fix this test.
     #[actix_rt::test]
     async fn test_req_parse_err() {
         lazy(|cx| {

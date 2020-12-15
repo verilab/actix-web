@@ -1,12 +1,12 @@
-use std::sync::mpsc;
-use std::{thread, time::Duration};
-
 #[cfg(feature = "openssl")]
 use open_ssl::ssl::SslAcceptorBuilder;
 
 #[cfg(unix)]
 #[actix_rt::test]
 async fn test_start() {
+    use std::sync::mpsc;
+    use std::{thread, time::Duration};
+
     use actix_server::ServerHandle;
     use actix_web::{test, web, App, HttpResponse, HttpServer};
 

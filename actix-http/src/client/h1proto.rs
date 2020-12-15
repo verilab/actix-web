@@ -4,6 +4,7 @@ use std::task::{Context, Poll};
 use std::{io, time};
 
 use actix_codec::{AsyncRead, AsyncWrite, Framed, ReadBuf};
+use actix_rt::ActixRuntime;
 use bytes::buf::BufMut;
 use bytes::{Bytes, BytesMut};
 use futures_core::Stream;
@@ -21,7 +22,6 @@ use super::connection::{ConnectionLifetime, ConnectionType, IoConnection};
 use super::error::{ConnectError, SendRequestError};
 use super::pool::Acquired;
 use crate::body::{BodySize, MessageBody};
-use actix_rt::ActixRuntime;
 
 pub(crate) async fn send_request<T, B>(
     io: T,

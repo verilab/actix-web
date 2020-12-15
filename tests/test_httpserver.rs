@@ -4,12 +4,12 @@ use std::{thread, time::Duration};
 #[cfg(feature = "openssl")]
 use open_ssl::ssl::SslAcceptorBuilder;
 
-use actix_server::ServerHandle;
-use actix_web::{test, web, App, HttpResponse, HttpServer};
-
 #[cfg(unix)]
 #[actix_rt::test]
 async fn test_start() {
+    use actix_server::ServerHandle;
+    use actix_web::{test, web, App, HttpResponse, HttpServer};
+
     let addr = test::unused_addr();
     let (tx, rx) = mpsc::channel();
 

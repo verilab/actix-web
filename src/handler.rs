@@ -1,13 +1,10 @@
 use std::convert::Infallible;
 use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
-use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_http::{Error, Response};
 use actix_service::{Service, ServiceFactory};
-use futures_core::ready;
-use pin_project::pin_project;
 
 use crate::extract::FromRequest;
 use crate::request::HttpRequest;
@@ -82,68 +79,71 @@ where
     type Request = (T, HttpRequest);
     type Response = ServiceResponse;
     type Error = Infallible;
-    type Future = HandlerServiceResponse<R, O>;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&self, (param, req): (T, HttpRequest)) -> Self::Future {
-        HandlerServiceResponse {
-            fut: self.hnd.call(param),
-            fut2: None,
-            req: Some(req),
-        }
-    }
-}
-
-#[doc(hidden)]
-#[pin_project]
-pub struct HandlerServiceResponse<T, R>
-where
-    T: Future<Output = R>,
-    R: Responder,
-{
-    #[pin]
-    fut: T,
-    #[pin]
-    fut2: Option<R::Future>,
-    req: Option<HttpRequest>,
-}
-
-impl<T, R> Future for HandlerServiceResponse<T, R>
-where
-    T: Future<Output = R>,
-    R: Responder,
-{
-    type Output = Result<ServiceResponse, Infallible>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.as_mut().project();
-
-        if let Some(fut) = this.fut2.as_pin_mut() {
-            return match fut.poll(cx) {
-                Poll::Ready(Ok(res)) => {
-                    Poll::Ready(Ok(ServiceResponse::new(this.req.take().unwrap(), res)))
-                }
-                Poll::Pending => Poll::Pending,
-                Poll::Ready(Err(e)) => {
+        let fut = self.hnd.call(param);
+        async move {
+            let res = fut.await;
+            let res = res.respond_to(&req).await;
+            match res {
+                Ok(res) => Ok(ServiceResponse::new(req, res)),
+                Err(e) => {
                     let res: Response = e.into().into();
-                    Poll::Ready(Ok(ServiceResponse::new(this.req.take().unwrap(), res)))
+                    Ok(ServiceResponse::new(req, res))
                 }
-            };
-        }
-
-        match this.fut.poll(cx) {
-            Poll::Ready(res) => {
-                let fut = res.respond_to(this.req.as_ref().unwrap());
-                self.as_mut().project().fut2.set(Some(fut));
-                self.poll(cx)
             }
-            Poll::Pending => Poll::Pending,
         }
     }
 }
+
+// #[doc(hidden)]
+// #[pin_project(project = HandlerProj)]
+// pub enum HandlerServiceResponse<T, R>
+// where
+//     T: Future<Output = R>,
+//     R: Responder,
+// {
+//     Future(#[pin] T, Option<HttpRequest>),
+//     Responder(#[pin] R::Future, Option<HttpRequest>),
+// }
+//
+// impl<T, R> Future for HandlerServiceResponse<T, R>
+// where
+//     T: Future<Output = R>,
+//     R: Responder,
+// {
+//     type Output = Result<ServiceResponse, Infallible>;
+//
+//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//         loop {
+//             match self.as_mut().project() {
+//                 HandlerProj::Future(fut, req) => {
+//                     let res = ready!(fut.poll(cx));
+//                     let fut = res.respond_to(req.as_ref().unwrap());
+//                     let req = req.take();
+//                     self.as_mut()
+//                         .set(HandlerServiceResponse::Responder(fut, req));
+//                 }
+//                 HandlerProj::Responder(fut, req) => {
+//                     let res = ready!(fut.poll(cx));
+//                     let req = req.take().unwrap();
+//                     return match res {
+//                         Ok(res) => Poll::Ready(Ok(ServiceResponse::new(req, res))),
+//                         Err(e) => {
+//                             let res: Response = e.into().into();
+//                             Poll::Ready(Ok(ServiceResponse::new(req, res)))
+//                         }
+//                     };
+//                 }
+//             }
+//         }
+//     }
+// }
 
 /// Extract arguments from request
 pub struct Extract<T: FromRequest, S> {
@@ -170,7 +170,7 @@ where
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse;
-    type Error = (Error, ServiceRequest);
+    type Error = Error;
     type Config = ();
     type Service = ExtractService<T, S>;
     type InitError = ();
@@ -199,8 +199,8 @@ where
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse;
-    type Error = (Error, ServiceRequest);
-    type Future = ExtractResponse<T, S>;
+    type Error = Error;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
@@ -209,56 +209,57 @@ where
     fn call(&self, req: ServiceRequest) -> Self::Future {
         let (req, mut payload) = req.into_parts();
         let fut = T::from_request(&req, &mut payload);
-
-        ExtractResponse {
-            fut,
-            req,
-            fut_s: None,
-            service: self.service.clone(),
-        }
-    }
-}
-
-#[pin_project]
-pub struct ExtractResponse<T: FromRequest, S: Service> {
-    req: HttpRequest,
-    service: S,
-    #[pin]
-    fut: T::Future,
-    #[pin]
-    fut_s: Option<S::Future>,
-}
-
-impl<T: FromRequest, S> Future for ExtractResponse<T, S>
-where
-    S: Service<
-        Request = (T, HttpRequest),
-        Response = ServiceResponse,
-        Error = Infallible,
-    >,
-{
-    type Output = Result<ServiceResponse, (Error, ServiceRequest)>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.as_mut().project();
-
-        if let Some(fut) = this.fut_s.as_pin_mut() {
-            return fut.poll(cx).map_err(|_| panic!());
-        }
-
-        match ready!(this.fut.poll(cx)) {
-            Err(e) => {
-                let req = ServiceRequest::new(this.req.clone());
-                Poll::Ready(Err((e.into(), req)))
-            }
-            Ok(item) => {
-                let fut = Some(this.service.call((item, this.req.clone())));
-                self.as_mut().project().fut_s.set(fut);
-                self.poll(cx)
+        let srv = self.service.clone();
+        async move {
+            match fut.await {
+                Ok(item) => srv.call((item, req)).await.map_err(|_| panic!()),
+                Err(e) => {
+                    let req = ServiceRequest::new(req);
+                    Ok(req.error_response(e))
+                }
             }
         }
     }
 }
+
+// #[pin_project(project = ExtractProj)]
+// pub enum ExtractResponse<T: FromRequest, S: Service> {
+//     Future(#[pin] T::Future, Option<HttpRequest>, S),
+//     Response(#[pin] S::Future),
+// }
+//
+// impl<T: FromRequest, S> Future for ExtractResponse<T, S>
+//     where
+//         S: Service<
+//             Request = (T, HttpRequest),
+//             Response = ServiceResponse,
+//             Error = Infallible,
+//         >,
+// {
+//     type Output = Result<ServiceResponse, Error>;
+//
+//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+//         loop {
+//             match self.as_mut().project() {
+//                 ExtractProj::Future(fut, req, srv) => {
+//                     let res = ready!(fut.poll(cx));
+//                     let req = req.take().unwrap();
+//                     match res {
+//                         Err(e) => {
+//                             let req = ServiceRequest::new(req);
+//                             return Poll::Ready(Ok(req.error_response(e)))
+//                         }
+//                         Ok(item) => {
+//                             let fut = srv.call((item, req));
+//                             self.as_mut().set(ExtractResponse::Response(fut));
+//                         }
+//                     }
+//                 }
+//                 ExtractProj::Response(fut) => return fut.poll(cx).map_err(|_| panic!())
+//             }
+//         }
+//     }
+// }
 
 /// FromRequest trait impl for tuples
 macro_rules! factory_tuple ({ $(($n:tt, $T:ident)),+} => {

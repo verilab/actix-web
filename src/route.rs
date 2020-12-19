@@ -16,24 +16,24 @@ use crate::responder::Responder;
 use crate::service::{ServiceRequest, ServiceResponse};
 use crate::HttpResponse;
 
-type BoxedRouteService<Req, Res> = Box<
+type BoxedRouteService = Box<
     dyn Service<
-        Request = Req,
-        Response = Res,
+        Request = ServiceRequest,
+        Response = ServiceResponse,
         Error = Error,
-        Future = LocalBoxFuture<'static, Result<Res, Error>>,
+        Future = LocalBoxFuture<'static, Result<ServiceResponse, Error>>,
     >,
 >;
 
-type BoxedRouteNewService<Req, Res> = Box<
+type BoxedRouteNewService = Box<
     dyn ServiceFactory<
         Config = (),
-        Request = Req,
-        Response = Res,
+        Request = ServiceRequest,
+        Response = ServiceResponse,
         Error = Error,
         InitError = (),
-        Service = BoxedRouteService<Req, Res>,
-        Future = LocalBoxFuture<'static, Result<BoxedRouteService<Req, Res>, ()>>,
+        Service = BoxedRouteService,
+        Future = LocalBoxFuture<'static, Result<BoxedRouteService, ()>>,
     >,
 >;
 
@@ -42,7 +42,7 @@ type BoxedRouteNewService<Req, Res> = Box<
 /// Route uses builder-like pattern for configuration.
 /// If handler is not explicitly set, default *404 Not Found* handler is used.
 pub struct Route {
-    service: BoxedRouteNewService<ServiceRequest, ServiceResponse>,
+    service: BoxedRouteNewService,
     guards: Rc<Vec<Box<dyn Guard>>>,
 }
 
@@ -80,15 +80,8 @@ impl ServiceFactory for Route {
     }
 }
 
-type RouteFuture = LocalBoxFuture<
-    'static,
-    Result<BoxedRouteService<ServiceRequest, ServiceResponse>, ()>,
->;
-
-#[pin_project::pin_project]
 pub struct CreateRouteService {
-    #[pin]
-    fut: RouteFuture,
+    fut: LocalBoxFuture<'static, Result<BoxedRouteService, ()>>,
     guards: Rc<Vec<Box<dyn Guard>>>,
 }
 
@@ -96,9 +89,9 @@ impl Future for CreateRouteService {
     type Output = Result<RouteService, ()>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
+        let this = self.get_mut();
 
-        match this.fut.poll(cx)? {
+        match this.fut.as_mut().poll(cx)? {
             Poll::Ready(service) => Poll::Ready(Ok(RouteService {
                 service,
                 guards: this.guards.clone(),
@@ -109,7 +102,7 @@ impl Future for CreateRouteService {
 }
 
 pub struct RouteService {
-    service: BoxedRouteService<ServiceRequest, ServiceResponse>,
+    service: BoxedRouteService,
     guards: Rc<Vec<Box<dyn Guard>>>,
 }
 
@@ -279,7 +272,7 @@ where
     type Response = ServiceResponse;
     type Error = Error;
     type Config = ();
-    type Service = BoxedRouteService<ServiceRequest, Self::Response>;
+    type Service = BoxedRouteService;
     type InitError = ();
     type Future = LocalBoxFuture<'static, Result<Self::Service, Self::InitError>>;
 

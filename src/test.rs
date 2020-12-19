@@ -678,6 +678,7 @@ where
 ///     assert!(response.status().is_success());
 /// }
 /// ```
+#[allow(clippy::async_yields_async)]
 pub fn start_with<F, I, S, B>(cfg: TestServerConfig, factory: F) -> TestServer
 where
     F: Fn() -> I + Send + Clone + 'static,

@@ -1,7 +1,7 @@
+use std::future::{ready, Ready};
 use std::{any::type_name, ops::Deref};
 
 use actix_http::error::{Error, ErrorInternalServerError};
-use futures_util::future;
 
 use crate::{dev::Payload, FromRequest, HttpRequest};
 
@@ -65,13 +65,13 @@ impl<T: Clone + 'static> Deref for ReqData<T> {
 }
 
 impl<T: Clone + 'static> FromRequest for ReqData<T> {
-    type Config = ();
     type Error = Error;
-    type Future = future::Ready<Result<Self, Error>>;
+    type Future = Ready<Result<Self, Error>>;
+    type Config = ();
 
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(st) = req.extensions().get::<T>() {
-            future::ok(ReqData(st.clone()))
+            ready(Ok(ReqData(st.clone())))
         } else {
             log::debug!(
                 "Failed to construct App-level ReqData extractor. \
@@ -79,9 +79,9 @@ impl<T: Clone + 'static> FromRequest for ReqData<T> {
                 req.path(),
                 type_name::<T>(),
             );
-            future::err(ErrorInternalServerError(
+            ready(Err(ErrorInternalServerError(
                 "Missing expected request extension data",
-            ))
+            )))
         }
     }
 }

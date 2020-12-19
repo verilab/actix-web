@@ -1,9 +1,10 @@
 //! Error and Result module
 
-pub use actix_http::error::*;
 use derive_more::{Display, From};
 use serde_json::error::Error as JsonError;
 use url::ParseError as UrlParseError;
+
+pub use actix_http::error::*;
 
 use crate::http::StatusCode;
 use crate::HttpResponse;

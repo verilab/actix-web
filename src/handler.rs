@@ -1,13 +1,12 @@
 use std::convert::Infallible;
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use actix_http::{Error, Response};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ok, Ready};
-use futures_util::ready;
+use futures_core::ready;
 use pin_project::pin_project;
 
 use crate::extract::FromRequest;
@@ -169,19 +168,19 @@ where
             Error = Infallible,
         > + Clone,
 {
-    type Config = ();
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = (Error, ServiceRequest);
-    type InitError = ();
+    type Config = ();
     type Service = ExtractService<T, S>;
+    type InitError = ();
     type Future = Ready<Result<Self::Service, ()>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(ExtractService {
+        ready(Ok(ExtractService {
             _t: PhantomData,
             service: self.service.clone(),
-        })
+        }))
     }
 }
 

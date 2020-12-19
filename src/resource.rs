@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fmt;
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -11,7 +11,7 @@ use actix_service::boxed::{self, BoxService, BoxServiceFactory};
 use actix_service::{
     apply, apply_fn_factory, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
-use futures_util::future::{ok, Either, LocalBoxFuture, Ready};
+use futures_util::future::{Either, LocalBoxFuture};
 
 use crate::data::Data;
 use crate::dev::{insert_slash, AppService, HttpServiceFactory, ResourceDef};
@@ -549,10 +549,10 @@ impl Service for ResourceService {
             Either::Right(default.call(req))
         } else {
             let req = req.into_parts().0;
-            Either::Left(ok(ServiceResponse::new(
+            Either::Left(ready(Ok(ServiceResponse::new(
                 req,
                 Response::MethodNotAllowed().finish(),
-            )))
+            ))))
         }
     }
 }

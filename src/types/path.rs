@@ -1,10 +1,10 @@
 //! Path extractor
+use std::future::{ready, Ready};
 use std::sync::Arc;
 use std::{fmt, ops};
 
 use actix_http::error::{Error, ErrorNotFound};
 use actix_router::PathDeserializer;
-use futures_util::future::{ready, Ready};
 use serde::de;
 
 use crate::dev::Payload;

@@ -1,5 +1,6 @@
 //! Various helpers for Actix applications to use during testing.
 use std::convert::TryFrom;
+use std::future::ready;
 use std::net::SocketAddr;
 use std::rc::Rc;
 use std::sync::mpsc;
@@ -22,7 +23,6 @@ use awc::error::PayloadError;
 use awc::{Client, ClientRequest, ClientResponse, Connector};
 use bytes::{Bytes, BytesMut};
 use futures_core::Stream;
-use futures_util::future::ok;
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -51,7 +51,9 @@ pub fn default_service(
 ) -> impl Service<Request = ServiceRequest, Response = ServiceResponse<Body>, Error = Error>
 {
     (move |req: ServiceRequest| {
-        ok(req.into_response(HttpResponse::build(status_code).finish()))
+        ready(Ok(
+            req.into_response(HttpResponse::build(status_code).finish())
+        ))
     })
     .into_service()
 }

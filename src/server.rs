@@ -17,8 +17,6 @@ use actix_service::{map_config, IntoServiceFactory, Service, ServiceFactory};
 use actix_http::Protocol;
 #[cfg(unix)]
 use actix_service::pipeline_factory;
-#[cfg(unix)]
-use futures_util::future::ok;
 
 #[cfg(feature = "openssl")]
 use actix_tls::openssl::{AlpnError, SslAcceptor, SslAcceptorBuilder};
@@ -462,7 +460,7 @@ where
                 );
                 pipeline_factory(|io: St| {
                     let peer_add = io.peer_addr();
-                    ok((io, Protocol::Http1, peer_add))
+                    std::future::ready(Ok((io, Protocol::Http1, peer_add)))
                 })
                 .and_then(
                     HttpService::build()

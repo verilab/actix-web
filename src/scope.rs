@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 use std::fmt;
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -11,7 +11,8 @@ use actix_service::boxed::{self, BoxService, BoxServiceFactory};
 use actix_service::{
     apply, apply_fn_factory, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
-use futures_util::future::{ok, Either, LocalBoxFuture, Ready};
+use futures_core::future::LocalBoxFuture;
+use futures_util::future::Either;
 
 use crate::config::ServiceConfig;
 use crate::data::Data;
@@ -636,7 +637,10 @@ impl Service for ScopeService {
             Either::Left(default.call(req))
         } else {
             let req = req.into_parts().0;
-            Either::Right(ok(ServiceResponse::new(req, Response::NotFound().finish())))
+            Either::Right(ready(Ok(ServiceResponse::new(
+                req,
+                Response::NotFound().finish(),
+            ))))
         }
     }
 }

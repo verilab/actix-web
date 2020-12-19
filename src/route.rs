@@ -1,13 +1,13 @@
 #![allow(clippy::rc_buffer)] // inner value is mutated before being shared (`Rc::get_mut`)
 
-use std::future::Future;
+use std::future::{ready, Future};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
 
 use actix_http::{http::Method, Error};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::{ready, LocalBoxFuture};
+use futures_util::future::LocalBoxFuture;
 
 use crate::extract::FromRequest;
 use crate::guard::{self, Guard};
@@ -320,15 +320,6 @@ where
                 Err((err, req)) => Ok(req.error_response(err)),
             }
         })
-
-        // match fut.poll() {
-        //     Poll::Ready(Ok(res)) => Either::Left(ok(res)),
-        //     Poll::Ready(Err((e, req))) => Either::Left(ok(req.error_response(e))),
-        //     Poll::Pending => Either::Right(Box::new(fut.then(|res| match res {
-        //         Ok(res) => Ok(res),
-        //         Err((err, req)) => Ok(req.error_response(err)),
-        //     }))),
-        // }
     }
 }
 

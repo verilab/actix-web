@@ -5,7 +5,7 @@ use std::task::{Context, Poll};
 
 use bytes::{Bytes, BytesMut};
 use encoding_rs::{Encoding, UTF_8};
-use futures_util::stream::Stream;
+use futures_core::stream::Stream;
 
 use crate::dev::Payload;
 use crate::error::{PayloadError, ReadlinesError};

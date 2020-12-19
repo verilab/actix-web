@@ -1,10 +1,10 @@
 //! Query extractor
 
+use std::future::{ready, Ready};
 use std::sync::Arc;
 use std::{fmt, ops};
 
 use actix_http::error::Error;
-use futures_util::future::{err, ok, Ready};
 use serde::de;
 
 use crate::dev::Payload;
@@ -145,7 +145,7 @@ where
             .unwrap_or(None);
 
         serde_urlencoded::from_str::<T>(req.query_string())
-            .map(|val| ok(Query(val)))
+            .map(|val| ready(Ok(Query(val))))
             .unwrap_or_else(move |e| {
                 let e = QueryPayloadError::Deserialize(e);
 
@@ -161,7 +161,7 @@ where
                     e.into()
                 };
 
-                err(e)
+                ready(Err(e))
             })
     }
 }

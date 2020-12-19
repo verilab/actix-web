@@ -1,6 +1,6 @@
 //! Json extractor/responder
 
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -8,9 +8,8 @@ use std::task::{Context, Poll};
 use std::{fmt, ops};
 
 use bytes::BytesMut;
-use futures_util::future::{ready, Ready};
-use futures_util::ready;
-use futures_util::stream::Stream;
+use futures_core::ready;
+use futures_core::stream::Stream;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -175,7 +174,7 @@ where
     T: DeserializeOwned + 'static,
 {
     type Error = Error;
-    type Future = JsonExtractFut<T>;
+    type Future = impl Future<Output = Result<Json<T>, Error>>;
     type Config = JsonConfig;
 
     #[inline]
@@ -186,55 +185,32 @@ where
         let ctype = config.content_type.clone();
         let err_handler = config.err_handler.clone();
 
-        JsonExtractFut {
-            req: Some(req.clone()),
-            fut: JsonBody::new(req, payload, ctype).limit(limit),
-            err_handler,
+        let fut = JsonBody::new(req, payload, ctype).limit(limit);
+        let req = req.clone();
+
+        async move {
+            match fut.await {
+                Ok(data) => Ok(Json(data)),
+                Err(e) => {
+                    log::debug!(
+                        "Failed to deserialize Json from payload. \
+                         Request path: {}",
+                        req.path()
+                    );
+
+                    if let Some(err) = err_handler.as_ref() {
+                        Err((*err)(e, &req))
+                    } else {
+                        Err(e.into())
+                    }
+                }
+            }
         }
     }
 }
 
 type JsonErrorHandler =
     Option<Arc<dyn Fn(JsonPayloadError, &HttpRequest) -> Error + Send + Sync>>;
-
-pub struct JsonExtractFut<T> {
-    req: Option<HttpRequest>,
-    fut: JsonBody<T>,
-    err_handler: JsonErrorHandler,
-}
-
-impl<T> Future for JsonExtractFut<T>
-where
-    T: DeserializeOwned + 'static,
-{
-    type Output = Result<Json<T>, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.get_mut();
-
-        let res = ready!(Pin::new(&mut this.fut).poll(cx));
-
-        let res = match res {
-            Err(e) => {
-                let req = this.req.take().unwrap();
-                log::debug!(
-                    "Failed to deserialize Json from payload. \
-                         Request path: {}",
-                    req.path()
-                );
-
-                if let Some(err) = this.err_handler.as_ref() {
-                    Err((*err)(e, &req))
-                } else {
-                    Err(e.into())
-                }
-            }
-            Ok(data) => Ok(Json(data)),
-        };
-
-        Poll::Ready(res)
-    }
-}
 
 /// Json extractor configuration
 ///

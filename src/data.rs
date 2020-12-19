@@ -1,10 +1,11 @@
 use std::any::type_name;
+use std::future::{ready, Ready};
 use std::ops::Deref;
 use std::sync::Arc;
 
 use actix_http::error::{Error, ErrorInternalServerError};
 use actix_http::Extensions;
-use futures_util::future::{err, ok, LocalBoxFuture, Ready};
+use futures_util::future::LocalBoxFuture;
 
 use crate::dev::Payload;
 use crate::extract::FromRequest;
@@ -102,14 +103,14 @@ impl<T: ?Sized> From<Arc<T>> for Data<T> {
 }
 
 impl<T: ?Sized + 'static> FromRequest for Data<T> {
-    type Config = ();
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
+    type Config = ();
 
     #[inline]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
         if let Some(st) = req.app_data::<Data<T>>() {
-            ok(st.clone())
+            ready(Ok(st.clone()))
         } else {
             log::debug!(
                 "Failed to construct App-level Data extractor. \
@@ -117,9 +118,9 @@ impl<T: ?Sized + 'static> FromRequest for Data<T> {
                 req.path(),
                 type_name::<T>(),
             );
-            err(ErrorInternalServerError(
+            ready(Err(ErrorInternalServerError(
                 "App data is not configured, to configure use App::data()",
-            ))
+            )))
         }
     }
 }

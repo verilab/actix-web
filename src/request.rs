@@ -1,11 +1,11 @@
 use std::cell::{Ref, RefCell, RefMut};
+use std::future::{ready, Ready};
 use std::rc::Rc;
 use std::{fmt, net};
 
 use actix_http::http::{HeaderMap, Method, Uri, Version};
 use actix_http::{Error, Extensions, HttpMessage, Message, Payload, RequestHead};
 use actix_router::{Path, Url};
-use futures_util::future::{ok, Ready};
 use tinyvec::TinyVec;
 
 use crate::config::AppConfig;
@@ -308,13 +308,13 @@ impl Drop for HttpRequest {
 /// }
 /// ```
 impl FromRequest for HttpRequest {
-    type Config = ();
     type Error = Error;
     type Future = Ready<Result<Self, Error>>;
+    type Config = ();
 
     #[inline]
     fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
-        ok(req.clone())
+        ready(Ok(req.clone()))
     }
 }
 

@@ -1,10 +1,10 @@
 //! `Middleware` to normalize request's URI
+use std::future::{ready, Ready};
 use std::task::{Context, Poll};
 
 use actix_http::http::{PathAndQuery, Uri};
 use actix_service::{Service, Transform};
 use bytes::Bytes;
-use futures_util::future::{ok, Ready};
 use regex::Regex;
 
 use crate::service::{ServiceRequest, ServiceResponse};
@@ -71,16 +71,16 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<B>;
     type Error = Error;
-    type InitError = ();
     type Transform = NormalizePathNormalization<S>;
+    type InitError = ();
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(NormalizePathNormalization {
+        ready(Ok(NormalizePathNormalization {
             service,
             merge_slash: Regex::new("//+").unwrap(),
             trailing_slash_behavior: self.0,
-        })
+        }))
     }
 }
 
@@ -158,6 +158,7 @@ where
 #[cfg(test)]
 mod tests {
     use actix_service::IntoService;
+    use futures_util::future::ok;
 
     use super::*;
     use crate::dev::ServiceRequest;

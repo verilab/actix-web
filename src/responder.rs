@@ -1,5 +1,5 @@
 use std::convert::TryFrom;
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -10,8 +10,8 @@ use actix_http::http::{
 };
 use actix_http::{Error, Response, ResponseBuilder};
 use bytes::{Bytes, BytesMut};
-use futures_util::future::{err, ok, Either as EitherFuture, Ready};
-use futures_util::ready;
+use futures_core::ready;
+use futures_util::future::Either as EitherFuture;
 use pin_project::pin_project;
 
 use crate::request::HttpRequest;
@@ -82,7 +82,7 @@ impl Responder for Response {
 
     #[inline]
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(self)
+        ready(Ok(self))
     }
 }
 
@@ -96,9 +96,10 @@ where
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
         match self {
             Some(t) => EitherFuture::Left(t.respond_to(req)),
-            None => {
-                EitherFuture::Right(ok(Response::build(StatusCode::NOT_FOUND).finish()))
-            }
+            None => EitherFuture::Right(ready(Ok(Response::build(
+                StatusCode::NOT_FOUND,
+            )
+            .finish()))),
         }
     }
 }
@@ -117,7 +118,7 @@ where
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
         match self {
             Ok(val) => EitherFuture::Left(ResponseFuture::new(val.respond_to(req))),
-            Err(e) => EitherFuture::Right(err(e.into())),
+            Err(e) => EitherFuture::Right(ready(Err(e.into()))),
         }
     }
 }
@@ -128,7 +129,7 @@ impl Responder for ResponseBuilder {
 
     #[inline]
     fn respond_to(mut self, _: &HttpRequest) -> Self::Future {
-        ok(self.finish())
+        ready(Ok(self.finish()))
     }
 }
 
@@ -153,9 +154,9 @@ impl Responder for &'static str {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -164,9 +165,9 @@ impl Responder for &'static [u8] {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -175,9 +176,9 @@ impl Responder for String {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -186,9 +187,9 @@ impl<'a> Responder for &'a String {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -197,9 +198,9 @@ impl Responder for Bytes {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -208,9 +209,9 @@ impl Responder for BytesMut {
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
-            .body(self))
+            .body(self)))
     }
 }
 
@@ -340,8 +341,7 @@ where
     type Future = Ready<Result<Response, Error>>;
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
-        let err: Error = self.into();
-        ok(err.into())
+        ready(Ok(Error::from(self).into()))
     }
 }
 

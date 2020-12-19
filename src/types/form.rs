@@ -1,6 +1,6 @@
 //! Form extractor
 
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::pin::Pin;
 use std::rc::Rc;
 use std::task::{Context, Poll};
@@ -9,7 +9,7 @@ use std::{fmt, ops};
 use actix_http::{Error, HttpMessage, Payload, Response};
 use bytes::BytesMut;
 use encoding_rs::{Encoding, UTF_8};
-use futures_util::future::{err, ok, FutureExt, LocalBoxFuture, Ready};
+use futures_util::future::{FutureExt, LocalBoxFuture};
 use futures_util::StreamExt;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -113,13 +113,12 @@ impl<T> FromRequest for Form<T>
 where
     T: DeserializeOwned + 'static,
 {
-    type Config = FormConfig;
     type Error = Error;
-    type Future = LocalBoxFuture<'static, Result<Self, Error>>;
+    type Future = impl Future<Output = Result<Self, Error>>;
+    type Config = FormConfig;
 
     #[inline]
     fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let req2 = req.clone();
         let (limit, err) = req
             .app_data::<Self::Config>()
             .or_else(|| {
@@ -129,19 +128,21 @@ where
             .map(|c| (c.limit, c.err_handler.clone()))
             .unwrap_or((16384, None));
 
-        UrlEncoded::new(req, payload)
-            .limit(limit)
-            .map(move |res| match res {
+        let fut = UrlEncoded::new(req, payload).limit(limit);
+        let req = req.clone();
+
+        async move {
+            match fut.await {
+                Ok(item) => Ok(Form(item)),
                 Err(e) => {
                     if let Some(err) = err {
-                        Err((*err)(e, &req2))
+                        Err((*err)(e, &req))
                     } else {
                         Err(e.into())
                     }
                 }
-                Ok(item) => Ok(Form(item)),
-            })
-            .boxed_local()
+            }
+        }
     }
 }
 
@@ -164,12 +165,12 @@ impl<T: Serialize> Responder for Form<T> {
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
         let body = match serde_urlencoded::to_string(&self.0) {
             Ok(body) => body,
-            Err(e) => return err(e.into()),
+            Err(e) => return ready(Err(e.into())),
         };
 
-        ok(Response::build(StatusCode::OK)
+        ready(Ok(Response::build(StatusCode::OK)
             .set(ContentType::form_url_encoded())
-            .body(body))
+            .body(body)))
     }
 }
 

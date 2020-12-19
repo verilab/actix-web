@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use std::convert::TryFrom;
 use std::env;
 use std::fmt::{self, Display, Formatter};
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -11,7 +11,6 @@ use std::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
 use bytes::Bytes;
-use futures_util::future::{ok, Ready};
 use log::debug;
 use regex::{Regex, RegexSet};
 use time::OffsetDateTime;
@@ -203,10 +202,10 @@ where
             }
         }
 
-        ok(LoggerMiddleware {
+        ready(Ok(LoggerMiddleware {
             service,
             inner: self.0.clone(),
-        })
+        }))
     }
 }
 

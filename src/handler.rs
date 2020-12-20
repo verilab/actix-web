@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
@@ -7,7 +6,6 @@ use actix_http::{Error, Response};
 use actix_service::{Service, ServiceFactory};
 
 use crate::extract::FromRequest;
-use crate::request::HttpRequest;
 use crate::responder::Responder;
 use crate::service::{ServiceRequest, ServiceResponse};
 
@@ -31,11 +29,12 @@ where
     }
 }
 
-#[doc(hidden)]
+/// Extract arguments from request, run factory function and make response.
 pub struct Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
     R: Future<Output = O>,
+    T: FromRequest,
     O: Responder,
 {
     hnd: F,
@@ -46,6 +45,7 @@ impl<F, T, R, O> Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
     R: Future<Output = O>,
+    T: FromRequest,
     O: Responder,
 {
     pub fn new(hnd: F) -> Self {
@@ -60,6 +60,7 @@ impl<F, T, R, O> Clone for Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
     R: Future<Output = O>,
+    T: FromRequest,
     O: Responder,
 {
     fn clone(&self) -> Self {
@@ -70,132 +71,33 @@ where
     }
 }
 
-impl<F, T, R, O> Service for Handler<F, T, R, O>
+impl<F, T, R, O> ServiceFactory for Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
     R: Future<Output = O>,
+    T: FromRequest,
     O: Responder,
-{
-    type Request = (T, HttpRequest);
-    type Response = ServiceResponse;
-    type Error = Infallible;
-    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
-
-    fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn call(&self, (param, req): (T, HttpRequest)) -> Self::Future {
-        let fut = self.hnd.call(param);
-        async move {
-            let res = fut.await;
-            let res = res.respond_to(&req).await;
-            match res {
-                Ok(res) => Ok(ServiceResponse::new(req, res)),
-                Err(e) => {
-                    let res: Response = e.into().into();
-                    Ok(ServiceResponse::new(req, res))
-                }
-            }
-        }
-    }
-}
-
-// #[doc(hidden)]
-// #[pin_project(project = HandlerProj)]
-// pub enum HandlerServiceResponse<T, R>
-// where
-//     T: Future<Output = R>,
-//     R: Responder,
-// {
-//     Future(#[pin] T, Option<HttpRequest>),
-//     Responder(#[pin] R::Future, Option<HttpRequest>),
-// }
-//
-// impl<T, R> Future for HandlerServiceResponse<T, R>
-// where
-//     T: Future<Output = R>,
-//     R: Responder,
-// {
-//     type Output = Result<ServiceResponse, Infallible>;
-//
-//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         loop {
-//             match self.as_mut().project() {
-//                 HandlerProj::Future(fut, req) => {
-//                     let res = ready!(fut.poll(cx));
-//                     let fut = res.respond_to(req.as_ref().unwrap());
-//                     let req = req.take();
-//                     self.as_mut()
-//                         .set(HandlerServiceResponse::Responder(fut, req));
-//                 }
-//                 HandlerProj::Responder(fut, req) => {
-//                     let res = ready!(fut.poll(cx));
-//                     let req = req.take().unwrap();
-//                     return match res {
-//                         Ok(res) => Poll::Ready(Ok(ServiceResponse::new(req, res))),
-//                         Err(e) => {
-//                             let res: Response = e.into().into();
-//                             Poll::Ready(Ok(ServiceResponse::new(req, res)))
-//                         }
-//                     };
-//                 }
-//             }
-//         }
-//     }
-// }
-
-/// Extract arguments from request
-pub struct Extract<T: FromRequest, S> {
-    service: S,
-    _t: PhantomData<T>,
-}
-
-impl<T: FromRequest, S> Extract<T, S> {
-    pub fn new(service: S) -> Self {
-        Extract {
-            service,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T: FromRequest, S> ServiceFactory for Extract<T, S>
-where
-    S: Service<
-            Request = (T, HttpRequest),
-            Response = ServiceResponse,
-            Error = Infallible,
-        > + Clone,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse;
     type Error = Error;
     type Config = ();
-    type Service = ExtractService<T, S>;
+    type Service = Self;
     type InitError = ();
     type Future = Ready<Result<Self::Service, ()>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ready(Ok(ExtractService {
-            _t: PhantomData,
-            service: self.service.clone(),
-        }))
+        ready(Ok(self.clone()))
     }
 }
 
-pub struct ExtractService<T: FromRequest, S> {
-    service: S,
-    _t: PhantomData<T>,
-}
-
-impl<T: FromRequest, S> Service for ExtractService<T, S>
+// Handler is both the Service and ServiceFactory type.
+impl<F, T, R, O> Service for Handler<F, T, R, O>
 where
-    S: Service<
-            Request = (T, HttpRequest),
-            Response = ServiceResponse,
-            Error = Infallible,
-        > + Clone,
+    F: Factory<T, R, O>,
+    R: Future<Output = O>,
+    T: FromRequest,
+    O: Responder,
 {
     type Request = ServiceRequest;
     type Response = ServiceResponse;
@@ -206,13 +108,26 @@ where
         Poll::Ready(Ok(()))
     }
 
-    fn call(&self, req: ServiceRequest) -> Self::Future {
+    fn call(&self, req: Self::Request) -> Self::Future {
         let (req, mut payload) = req.into_parts();
-        let fut = T::from_request(&req, &mut payload);
-        let srv = self.service.clone();
+        let handle = self.hnd.clone();
         async move {
-            match fut.await {
-                Ok(item) => srv.call((item, req)).await.map_err(|_| panic!()),
+            // extract items from request.
+            match T::from_request(&req, &mut payload).await {
+                Ok(item) => {
+                    // pass item to handler function and call Responder on the return type.
+                    let res = handle.call(item).await.respond_to(&req).await;
+
+                    // always return a ServiceResponse type and Error type is a placeholder type
+                    // that never used.
+                    match res {
+                        Ok(res) => Ok(ServiceResponse::new(req, res)),
+                        Err(e) => {
+                            let res: Response = e.into().into();
+                            Ok(ServiceResponse::new(req, res))
+                        }
+                    }
+                }
                 Err(e) => {
                     let req = ServiceRequest::new(req);
                     Ok(req.error_response(e))
@@ -221,45 +136,6 @@ where
         }
     }
 }
-
-// #[pin_project(project = ExtractProj)]
-// pub enum ExtractResponse<T: FromRequest, S: Service> {
-//     Future(#[pin] T::Future, Option<HttpRequest>, S),
-//     Response(#[pin] S::Future),
-// }
-//
-// impl<T: FromRequest, S> Future for ExtractResponse<T, S>
-//     where
-//         S: Service<
-//             Request = (T, HttpRequest),
-//             Response = ServiceResponse,
-//             Error = Infallible,
-//         >,
-// {
-//     type Output = Result<ServiceResponse, Error>;
-//
-//     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-//         loop {
-//             match self.as_mut().project() {
-//                 ExtractProj::Future(fut, req, srv) => {
-//                     let res = ready!(fut.poll(cx));
-//                     let req = req.take().unwrap();
-//                     match res {
-//                         Err(e) => {
-//                             let req = ServiceRequest::new(req);
-//                             return Poll::Ready(Ok(req.error_response(e)))
-//                         }
-//                         Ok(item) => {
-//                             let fut = srv.call((item, req));
-//                             self.as_mut().set(ExtractResponse::Response(fut));
-//                         }
-//                     }
-//                 }
-//                 ExtractProj::Response(fut) => return fut.poll(cx).map_err(|_| panic!())
-//             }
-//         }
-//     }
-// }
 
 /// FromRequest trait impl for tuples
 macro_rules! factory_tuple ({ $(($n:tt, $T:ident)),+} => {

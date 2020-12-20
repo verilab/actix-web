@@ -1,8 +1,10 @@
 //! `Middleware` for conditionally enables another middleware.
+use std::future::ready;
 use std::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
-use futures_util::future::{ok, Either, FutureExt, LocalBoxFuture};
+use futures_core::future::LocalBoxFuture;
+use futures_util::future::{Either, FutureExt};
 
 /// `Middleware` for conditionally enables another middleware.
 /// The controlled middleware must not change the `Service` interfaces.
@@ -42,8 +44,8 @@ where
     type Request = S::Request;
     type Response = S::Response;
     type Error = S::Error;
-    type InitError = T::InitError;
     type Transform = ConditionMiddleware<T::Transform, S>;
+    type InitError = T::InitError;
     type Future = LocalBoxFuture<'static, Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
@@ -55,7 +57,7 @@ where
             });
             Either::Left(f)
         } else {
-            Either::Right(ok(ConditionMiddleware::Disable(service)))
+            Either::Right(ready(Ok(ConditionMiddleware::Disable(service))))
         }
         .boxed_local()
     }
@@ -116,7 +118,9 @@ mod tests {
     #[actix_rt::test]
     async fn test_handler_enabled() {
         let srv = |req: ServiceRequest| {
-            ok(req.into_response(HttpResponse::InternalServerError().finish()))
+            ready(Ok(
+                req.into_response(HttpResponse::InternalServerError().finish())
+            ))
         };
 
         let mw =
@@ -134,7 +138,9 @@ mod tests {
     #[actix_rt::test]
     async fn test_handler_disabled() {
         let srv = |req: ServiceRequest| {
-            ok(req.into_response(HttpResponse::InternalServerError().finish()))
+            ready(Ok(
+                req.into_response(HttpResponse::InternalServerError().finish())
+            ))
         };
 
         let mw =

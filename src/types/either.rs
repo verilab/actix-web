@@ -6,7 +6,9 @@ use std::{
 
 use actix_http::{Error, Response};
 use bytes::Bytes;
-use futures_util::{future::LocalBoxFuture, ready, FutureExt, TryFutureExt};
+use futures_core::future::LocalBoxFuture;
+use futures_core::ready;
+use futures_util::{FutureExt, TryFutureExt};
 use pin_project::pin_project;
 
 use crate::{dev, request::HttpRequest, FromRequest, Responder};

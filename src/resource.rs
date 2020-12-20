@@ -11,7 +11,8 @@ use actix_service::boxed::{self, BoxService, BoxServiceFactory};
 use actix_service::{
     apply, apply_fn_factory, IntoServiceFactory, Service, ServiceFactory, Transform,
 };
-use futures_util::future::{Either, LocalBoxFuture};
+use futures_core::future::LocalBoxFuture;
+use futures_util::future::Either;
 
 use crate::data::Data;
 use crate::dev::{insert_slash, AppService, HttpServiceFactory, ResourceDef};

@@ -1,5 +1,5 @@
 use std::cell::RefCell;
-use std::future::Future;
+use std::future::{ready, Future};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -9,7 +9,8 @@ use actix_http::{Extensions, Request, Response};
 use actix_router::{Path, ResourceDef, ResourceInfo, Router, Url};
 use actix_service::boxed::{self, BoxService, BoxServiceFactory};
 use actix_service::{fn_service, Service, ServiceFactory};
-use futures_util::future::{join_all, ok, FutureExt, LocalBoxFuture};
+use futures_core::future::LocalBoxFuture;
+use futures_util::future::{join_all, FutureExt};
 use tinyvec::tiny_vec;
 
 use crate::config::{AppConfig, AppService};
@@ -57,19 +58,19 @@ where
         InitError = (),
     >,
 {
-    type Config = AppConfig;
     type Request = Request;
     type Response = ServiceResponse<B>;
     type Error = T::Error;
-    type InitError = T::InitError;
+    type Config = AppConfig;
     type Service = AppInitService<T::Service, B>;
+    type InitError = T::InitError;
     type Future = AppInitResult<T, B>;
 
     fn new_service(&self, config: AppConfig) -> Self::Future {
         // update resource default service
         let default = self.default.clone().unwrap_or_else(|| {
             Rc::new(boxed::factory(fn_service(|req: ServiceRequest| {
-                ok(req.into_response(Response::NotFound().finish()))
+                ready(Ok(req.into_response(Response::NotFound().finish())))
             })))
         });
 
@@ -420,7 +421,8 @@ impl Service for AppRouting {
             default.call(req)
         } else {
             let req = req.into_parts().0;
-            ok(ServiceResponse::new(req, Response::NotFound().finish())).boxed_local()
+            ready(Ok(ServiceResponse::new(req, Response::NotFound().finish())))
+                .boxed_local()
         }
     }
 }

@@ -9,8 +9,8 @@ use std::{fmt, ops};
 use actix_http::{Error, HttpMessage, Payload, Response};
 use bytes::BytesMut;
 use encoding_rs::{Encoding, UTF_8};
-use futures_util::future::{FutureExt, LocalBoxFuture};
-use futures_util::StreamExt;
+use futures_core::ready;
+use futures_core::stream::Stream;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -24,6 +24,7 @@ use crate::http::{
 };
 use crate::request::HttpRequest;
 use crate::{responder::Responder, web};
+use std::marker::PhantomData;
 
 /// Form data helper (`application/x-www-form-urlencoded`)
 ///
@@ -245,17 +246,22 @@ impl Default for FormConfig {
 /// * content type is not `application/x-www-form-urlencoded`
 /// * content-length is greater than 32k
 ///
-pub struct UrlEncoded<U> {
-    #[cfg(feature = "compress")]
-    stream: Option<Decompress<Payload>>,
-    #[cfg(not(feature = "compress"))]
-    stream: Option<Payload>,
-    limit: usize,
-    length: Option<usize>,
-    encoding: &'static Encoding,
-    err: Option<UrlencodedError>,
-    fut: Option<LocalBoxFuture<'static, Result<U, UrlencodedError>>>,
+pub enum UrlEncoded<U> {
+    Error(Option<UrlencodedError>),
+    Body {
+        #[cfg(feature = "compress")]
+        stream: Decompress<Payload>,
+        #[cfg(not(feature = "compress"))]
+        stream: Payload,
+        limit: usize,
+        length: Option<usize>,
+        encoding: &'static Encoding,
+        buf: BytesMut,
+        _res: PhantomData<U>,
+    },
 }
+
+impl<U> Unpin for UrlEncoded<U> {}
 
 #[allow(clippy::borrow_interior_mutable_const)]
 impl<U> UrlEncoded<U> {
@@ -263,23 +269,32 @@ impl<U> UrlEncoded<U> {
     pub fn new(req: &HttpRequest, payload: &mut Payload) -> UrlEncoded<U> {
         // check content type
         if req.content_type().to_lowercase() != "application/x-www-form-urlencoded" {
-            return Self::err(UrlencodedError::ContentType);
+            return Self::Error(Some(UrlencodedError::ContentType));
         }
+
         let encoding = match req.encoding() {
             Ok(enc) => enc,
-            Err(_) => return Self::err(UrlencodedError::ContentType),
+            Err(_) => return Self::Error(Some(UrlencodedError::ContentType)),
         };
 
         let mut len = None;
+        let limit = 32_768;
+
         if let Some(l) = req.headers().get(&CONTENT_LENGTH) {
             if let Ok(s) = l.to_str() {
                 if let Ok(l) = s.parse::<usize>() {
+                    if l > limit {
+                        return Self::Error(Some(UrlencodedError::Overflow {
+                            size: l,
+                            limit,
+                        }));
+                    }
                     len = Some(l)
                 } else {
-                    return Self::err(UrlencodedError::UnknownLength);
+                    return Self::Error(Some(UrlencodedError::UnknownLength));
                 }
             } else {
-                return Self::err(UrlencodedError::UnknownLength);
+                return Self::Error(Some(UrlencodedError::UnknownLength));
             }
         };
 
@@ -288,31 +303,45 @@ impl<U> UrlEncoded<U> {
         #[cfg(not(feature = "compress"))]
         let payload = payload.take();
 
-        UrlEncoded {
+        UrlEncoded::Body {
             encoding,
-            stream: Some(payload),
-            limit: 32_768,
+            stream: payload,
+            limit,
             length: len,
-            fut: None,
-            err: None,
-        }
-    }
-
-    fn err(e: UrlencodedError) -> Self {
-        UrlEncoded {
-            stream: None,
-            limit: 32_768,
-            fut: None,
-            err: Some(e),
-            length: None,
-            encoding: UTF_8,
+            buf: BytesMut::with_capacity(8192),
+            _res: PhantomData,
         }
     }
 
     /// Change max size of payload. By default max size is 256Kb
-    pub fn limit(mut self, limit: usize) -> Self {
-        self.limit = limit;
-        self
+    pub fn limit(self, limit: usize) -> Self {
+        match self {
+            UrlEncoded::Body {
+                encoding,
+                stream,
+                length,
+                buf,
+                ..
+            } => {
+                if let Some(len) = length {
+                    if len > limit {
+                        return UrlEncoded::Error(Some(UrlencodedError::Overflow {
+                            size: len,
+                            limit,
+                        }));
+                    }
+                }
+                UrlEncoded::Body {
+                    stream,
+                    limit,
+                    length,
+                    encoding,
+                    buf,
+                    _res: PhantomData,
+                }
+            }
+            _ => self,
+        }
     }
 }
 
@@ -322,58 +351,48 @@ where
 {
     type Output = Result<U, UrlencodedError>;
 
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(ref mut fut) = self.fut {
-            return Pin::new(fut).poll(cx);
-        }
-
-        if let Some(err) = self.err.take() {
-            return Poll::Ready(Err(err));
-        }
-
-        // payload size
-        let limit = self.limit;
-        if let Some(len) = self.length.take() {
-            if len > limit {
-                return Poll::Ready(Err(UrlencodedError::Overflow { size: len, limit }));
-            }
-        }
-
-        // future
-        let encoding = self.encoding;
-        let mut stream = self.stream.take().unwrap();
-
-        self.fut = Some(
-            async move {
-                let mut body = BytesMut::with_capacity(8192);
-
-                while let Some(item) = stream.next().await {
-                    let chunk = item?;
-                    if (body.len() + chunk.len()) > limit {
-                        return Err(UrlencodedError::Overflow {
-                            size: body.len() + chunk.len(),
-                            limit,
-                        });
-                    } else {
-                        body.extend_from_slice(&chunk);
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        let this = self.get_mut();
+        match this {
+            UrlEncoded::Error(e) => Poll::Ready(Err(e.take().unwrap())),
+            UrlEncoded::Body {
+                stream,
+                limit,
+                encoding,
+                buf,
+                ..
+            } => loop {
+                match ready!(Pin::new(&mut *stream).poll_next(cx)) {
+                    Some(chunk) => {
+                        let chunk = chunk?;
+                        if (buf.len() + chunk.len()) > *limit {
+                            return Poll::Ready(Err(UrlencodedError::Overflow {
+                                size: buf.len() + chunk.len(),
+                                limit: *limit,
+                            }));
+                        } else {
+                            buf.extend_from_slice(&chunk);
+                        }
+                    }
+                    None => {
+                        let res = if *encoding == UTF_8 {
+                            serde_urlencoded::from_bytes::<U>(&buf)
+                                .map_err(|_| UrlencodedError::Parse)
+                        } else {
+                            let body = encoding
+                                .decode_without_bom_handling_and_without_replacement(
+                                    &buf,
+                                )
+                                .map(|s| s.into_owned())
+                                .ok_or(UrlencodedError::Parse)?;
+                            serde_urlencoded::from_str::<U>(&body)
+                                .map_err(|_| UrlencodedError::Parse)
+                        };
+                        return Poll::Ready(res);
                     }
                 }
-
-                if encoding == UTF_8 {
-                    serde_urlencoded::from_bytes::<U>(&body)
-                        .map_err(|_| UrlencodedError::Parse)
-                } else {
-                    let body = encoding
-                        .decode_without_bom_handling_and_without_replacement(&body)
-                        .map(|s| s.into_owned())
-                        .ok_or(UrlencodedError::Parse)?;
-                    serde_urlencoded::from_str::<U>(&body)
-                        .map_err(|_| UrlencodedError::Parse)
-                }
-            }
-            .boxed_local(),
-        );
-        self.poll(cx)
+            },
+        }
     }
 }
 

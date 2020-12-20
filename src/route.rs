@@ -7,11 +7,11 @@ use std::task::{Context, Poll};
 
 use actix_http::{http::Method, Error};
 use actix_service::{Service, ServiceFactory};
-use futures_util::future::LocalBoxFuture;
+use futures_core::future::LocalBoxFuture;
 
 use crate::extract::FromRequest;
 use crate::guard::{self, Guard};
-use crate::handler::{Extract, Factory, Handler};
+use crate::handler::{Factory, Handler};
 use crate::responder::Responder;
 use crate::service::{ServiceRequest, ServiceResponse};
 use crate::HttpResponse;
@@ -51,9 +51,9 @@ impl Route {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Route {
         Route {
-            service: Box::new(RouteNewService::new(Extract::new(Handler::new(|| {
+            service: Box::new(RouteNewService::new(Handler::new(|| {
                 ready(HttpResponse::NotFound())
-            })))),
+            }))),
             guards: Rc::new(Vec::new()),
         }
     }
@@ -75,14 +75,14 @@ impl ServiceFactory for Route {
     fn new_service(&self, _: ()) -> Self::Future {
         CreateRouteService {
             fut: self.service.new_service(()),
-            guards: self.guards.clone(),
+            guards: Some(self.guards.clone()),
         }
     }
 }
 
 pub struct CreateRouteService {
     fut: LocalBoxFuture<'static, Result<BoxedRouteService, ()>>,
-    guards: Rc<Vec<Box<dyn Guard>>>,
+    guards: Option<Rc<Vec<Box<dyn Guard>>>>,
 }
 
 impl Future for CreateRouteService {
@@ -94,7 +94,7 @@ impl Future for CreateRouteService {
         match this.fut.as_mut().poll(cx)? {
             Poll::Ready(service) => Poll::Ready(Ok(RouteService {
                 service,
-                guards: this.guards.clone(),
+                guards: this.guards.take().unwrap(),
             })),
             Poll::Pending => Poll::Pending,
         }
@@ -226,8 +226,7 @@ impl Route {
         R: Future<Output = U> + 'static,
         U: Responder + 'static,
     {
-        self.service =
-            Box::new(RouteNewService::new(Extract::new(Handler::new(handler))));
+        self.service = Box::new(RouteNewService::new(Handler::new(handler)));
         self
     }
 }

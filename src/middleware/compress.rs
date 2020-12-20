@@ -1,6 +1,6 @@
 //! `Middleware` for compressing response body.
 use std::cmp;
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::str::FromStr;
@@ -11,7 +11,6 @@ use actix_http::encoding::Encoder;
 use actix_http::http::header::{ContentEncoding, ACCEPT_ENCODING};
 use actix_http::Error;
 use actix_service::{Service, Transform};
-use futures_util::future::{ok, Ready};
 use pin_project::pin_project;
 
 use crate::dev::BodyEncoding;
@@ -64,10 +63,10 @@ where
     type Future = Ready<Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
-        ok(CompressMiddleware {
+        ready(Ok(CompressMiddleware {
             service,
             encoding: self.0,
-        })
+        }))
     }
 }
 

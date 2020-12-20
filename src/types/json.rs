@@ -399,7 +399,7 @@ where
                     _res: PhantomData,
                 }
             }
-            JsonBody::Error(e) => JsonBody::Error(e),
+            _ => self,
         }
     }
 }
@@ -420,8 +420,7 @@ where
                 payload,
                 ..
             } => loop {
-                let res = ready!(Pin::new(&mut *payload).poll_next(cx));
-                match res {
+                match ready!(Pin::new(&mut *payload).poll_next(cx)) {
                     Some(chunk) => {
                         let chunk = chunk?;
                         if (buf.len() + chunk.len()) > *limit {

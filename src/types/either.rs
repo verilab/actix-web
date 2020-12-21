@@ -1,15 +1,7 @@
-use std::{
-    future::Future,
-    pin::Pin,
-    task::{Context, Poll},
-};
+use core::future::Future;
 
 use actix_http::{Error, Response};
 use bytes::Bytes;
-use futures_core::future::LocalBoxFuture;
-use futures_core::ready;
-use futures_util::{FutureExt, TryFutureExt};
-use pin_project::pin_project;
 
 use crate::{dev, request::HttpRequest, FromRequest, Responder};
 
@@ -71,40 +63,19 @@ where
     B: Responder,
 {
     type Error = Error;
-    type Future = EitherResponder<A, B>;
+    type Future = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
+        let mut left = None;
+        let mut right = None;
         match self {
-            Either::A(a) => EitherResponder::A(a.respond_to(req)),
-            Either::B(b) => EitherResponder::B(b.respond_to(req)),
-        }
-    }
-}
-
-#[pin_project(project = EitherResponderProj)]
-pub enum EitherResponder<A, B>
-where
-    A: Responder,
-    B: Responder,
-{
-    A(#[pin] A::Future),
-    B(#[pin] B::Future),
-}
-
-impl<A, B> Future for EitherResponder<A, B>
-where
-    A: Responder,
-    B: Responder,
-{
-    type Output = Result<Response, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        match self.project() {
-            EitherResponderProj::A(fut) => {
-                Poll::Ready(ready!(fut.poll(cx)).map_err(|e| e.into()))
-            }
-            EitherResponderProj::B(fut) => {
-                Poll::Ready(ready!(fut.poll(cx).map_err(|e| e.into())))
+            Either::A(a) => left = Some(a.respond_to(req)),
+            Either::B(b) => right = Some(b.respond_to(req)),
+        };
+        async move {
+            match left {
+                Some(left) => left.await.map_err(Into::into),
+                None => right.unwrap().await.map_err(Into::into),
             }
         }
     }
@@ -147,16 +118,17 @@ where
     B: FromRequest + 'static,
 {
     type Error = EitherExtractError<A::Error, B::Error>;
-    type Future = LocalBoxFuture<'static, Result<Self, Self::Error>>;
+    type Future = impl Future<Output = Result<Self, Self::Error>>;
     type Config = ();
 
     fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
         let req2 = req.clone();
+        let fut = Bytes::from_request(req, payload);
 
-        Bytes::from_request(req, payload)
-            .map_err(EitherExtractError::Bytes)
-            .and_then(|bytes| bytes_to_a_or_b(req2, bytes))
-            .boxed_local()
+        async move {
+            let bytes = fut.await.map_err(EitherExtractError::Bytes)?;
+            bytes_to_a_or_b(req2, bytes).await
+        }
     }
 }
 

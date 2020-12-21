@@ -1,10 +1,9 @@
-use std::{
-    any::Any,
-    fmt, io,
-    marker::PhantomData,
-    net,
-    sync::{Arc, Mutex},
-};
+use core::any::Any;
+use core::fmt;
+use core::marker::PhantomData;
+
+use std::sync::{Arc, Mutex};
+use std::{io, net};
 
 use actix_http::{
     body::MessageBody, Error, Extensions, HttpService, KeepAlive, Request, Response,

@@ -1,8 +1,5 @@
-use std::convert::TryFrom;
-use std::future::{ready, Future, Ready};
-use std::marker::PhantomData;
-use std::pin::Pin;
-use std::task::{Context, Poll};
+use core::convert::TryFrom;
+use core::future::{ready, Future, Ready};
 
 use actix_http::error::InternalError;
 use actix_http::http::{
@@ -10,9 +7,6 @@ use actix_http::http::{
 };
 use actix_http::{Error, Response, ResponseBuilder};
 use bytes::{Bytes, BytesMut};
-use futures_core::ready;
-use futures_util::future::Either as EitherFuture;
-use pin_project::pin_project;
 
 use crate::request::HttpRequest;
 
@@ -91,15 +85,15 @@ where
     T: Responder,
 {
     type Error = T::Error;
-    type Future = EitherFuture<T::Future, Ready<Result<Response, T::Error>>>;
+    type Future = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        match self {
-            Some(t) => EitherFuture::Left(t.respond_to(req)),
-            None => EitherFuture::Right(ready(Ok(Response::build(
-                StatusCode::NOT_FOUND,
-            )
-            .finish()))),
+        let fut = self.map(|t| t.respond_to(req));
+        async move {
+            match fut {
+                Some(f) => f.await,
+                None => Ok(Response::build(StatusCode::NOT_FOUND).finish()),
+            }
         }
     }
 }
@@ -110,15 +104,20 @@ where
     E: Into<Error>,
 {
     type Error = Error;
-    type Future = EitherFuture<
-        ResponseFuture<T::Future, T::Error>,
-        Ready<Result<Response, Error>>,
-    >;
+    type Future = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
+        let mut left = None;
+        let mut right = None;
         match self {
-            Ok(val) => EitherFuture::Left(ResponseFuture::new(val.respond_to(req))),
-            Err(e) => EitherFuture::Right(ready(Err(e.into()))),
+            Ok(val) => left = Some(val.respond_to(req)),
+            Err(e) => right = Some(Err(e.into())),
+        };
+        async move {
+            match left {
+                Some(left) => left.await.map_err(Into::into),
+                None => right.unwrap(),
+            }
         }
     }
 }
@@ -138,13 +137,15 @@ where
     T: Responder,
 {
     type Error = T::Error;
-    type Future = CustomResponderFut<T>;
+    type Future = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        CustomResponderFut {
-            fut: self.0.respond_to(req),
-            status: Some(self.1),
-            headers: None,
+        let fut = self.0.respond_to(req);
+        let status = self.1;
+        async move {
+            let mut res = fut.await?;
+            *res.status_mut() = status;
+            Ok(res)
         }
     }
 }
@@ -292,44 +293,24 @@ impl<T: Responder> CustomResponder<T> {
 
 impl<T: Responder> Responder for CustomResponder<T> {
     type Error = T::Error;
-    type Future = CustomResponderFut<T>;
+    type Future = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        CustomResponderFut {
-            fut: self.responder.respond_to(req),
-            status: self.status,
-            headers: self.headers,
-        }
-    }
-}
-
-#[pin_project]
-pub struct CustomResponderFut<T: Responder> {
-    #[pin]
-    fut: T::Future,
-    status: Option<StatusCode>,
-    headers: Option<HeaderMap>,
-}
-
-impl<T: Responder> Future for CustomResponderFut<T> {
-    type Output = Result<Response, T::Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        let mut res = match ready!(this.fut.poll(cx)) {
-            Ok(res) => res,
-            Err(e) => return Poll::Ready(Err(e)),
-        };
-        if let Some(status) = this.status.take() {
-            *res.status_mut() = status;
-        }
-        if let Some(ref headers) = this.headers {
-            for (k, v) in headers {
-                res.headers_mut().insert(k.clone(), v.clone());
+        let fut = self.responder.respond_to(req);
+        let mut status = self.status;
+        let headers = self.headers;
+        async move {
+            let mut res = fut.await?;
+            if let Some(status) = status.take() {
+                *res.status_mut() = status;
             }
+            if let Some(ref headers) = headers {
+                for (k, v) in headers {
+                    res.headers_mut().insert(k.clone(), v.clone());
+                }
+            }
+            Ok(res)
         }
-        Poll::Ready(Ok(res))
     }
 }
 
@@ -342,34 +323,6 @@ where
 
     fn respond_to(self, _: &HttpRequest) -> Self::Future {
         ready(Ok(Error::from(self).into()))
-    }
-}
-
-#[pin_project]
-pub struct ResponseFuture<T, E> {
-    #[pin]
-    fut: T,
-    _t: PhantomData<E>,
-}
-
-impl<T, E> ResponseFuture<T, E> {
-    pub fn new(fut: T) -> Self {
-        ResponseFuture {
-            fut,
-            _t: PhantomData,
-        }
-    }
-}
-
-impl<T, E> Future for ResponseFuture<T, E>
-where
-    T: Future<Output = Result<Response, E>>,
-    E: Into<Error>,
-{
-    type Output = Result<Response, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        Poll::Ready(ready!(self.project().fut.poll(cx)).map_err(|e| e.into()))
     }
 }
 

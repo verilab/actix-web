@@ -1,6 +1,8 @@
-use std::cell::{Ref, RefMut};
+use core::cell::{Ref, RefMut};
+use core::fmt;
+
+use std::net;
 use std::rc::Rc;
-use std::{fmt, net};
 
 use actix_http::body::{Body, MessageBody, ResponseBody};
 use actix_http::http::{HeaderMap, Method, StatusCode, Uri, Version};
@@ -488,12 +490,12 @@ impl WebService {
     where
         F: IntoServiceFactory<T>,
         T: ServiceFactory<
-                Config = (),
-                Request = ServiceRequest,
-                Response = ServiceResponse,
-                Error = Error,
-                InitError = (),
-            > + 'static,
+            Config = (),
+            Request = ServiceRequest,
+            Response = ServiceResponse,
+            Error = Error,
+            InitError = (),
+        > + 'static,
     {
         WebServiceImpl {
             srv: service.into_factory(),
@@ -514,12 +516,12 @@ struct WebServiceImpl<T> {
 impl<T> HttpServiceFactory for WebServiceImpl<T>
 where
     T: ServiceFactory<
-            Config = (),
-            Request = ServiceRequest,
-            Response = ServiceResponse,
-            Error = Error,
-            InitError = (),
-        > + 'static,
+        Config = (),
+        Request = ServiceRequest,
+        Response = ServiceResponse,
+        Error = Error,
+        InitError = (),
+    > + 'static,
 {
     fn register(mut self, config: &mut AppService) {
         let guards = if self.guards.is_empty() {

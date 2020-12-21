@@ -1,4 +1,4 @@
-use std::future::{ready, Ready};
+use core::future::{ready, Ready};
 use std::{any::type_name, ops::Deref};
 
 use actix_http::error::{Error, ErrorInternalServerError};

@@ -1,10 +1,11 @@
 //! Form extractor
 
-use std::future::{ready, Future, Ready};
-use std::pin::Pin;
+use core::future::{ready, Future, Ready};
+use core::pin::Pin;
+use core::task::{Context, Poll};
+use core::{fmt, ops};
+
 use std::rc::Rc;
-use std::task::{Context, Poll};
-use std::{fmt, ops};
 
 use actix_http::{Error, HttpMessage, Payload, Response};
 use bytes::BytesMut;

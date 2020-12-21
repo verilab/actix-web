@@ -311,20 +311,15 @@ where
     }
 }
 
-use pin_project::{pin_project, pinned_drop};
-
-#[pin_project(PinnedDrop)]
 pub struct StreamLog<B> {
-    #[pin]
     body: ResponseBody<B>,
     format: Option<Format>,
     size: usize,
     time: OffsetDateTime,
 }
 
-#[pinned_drop]
-impl<B> PinnedDrop for StreamLog<B> {
-    fn drop(self: Pin<&mut Self>) {
+impl<B> Drop for StreamLog<B> {
+    fn drop(&mut self) {
         if let Some(ref format) = self.format {
             let render = |fmt: &mut Formatter<'_>| {
                 for unit in &format.0 {
@@ -337,7 +332,7 @@ impl<B> PinnedDrop for StreamLog<B> {
     }
 }
 
-impl<B: MessageBody> MessageBody for StreamLog<B> {
+impl<B: MessageBody + Unpin> MessageBody for StreamLog<B> {
     fn size(&self) -> BodySize {
         self.body.size()
     }
@@ -346,10 +341,10 @@ impl<B: MessageBody> MessageBody for StreamLog<B> {
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
     ) -> Poll<Option<Result<Bytes, Error>>> {
-        let this = self.project();
-        match this.body.poll_next(cx) {
+        let this = self.get_mut();
+        match Pin::new(&mut this.body).poll_next(cx) {
             Poll::Ready(Some(Ok(chunk))) => {
-                *this.size += chunk.len();
+                this.size += chunk.len();
                 Poll::Ready(Some(Ok(chunk)))
             }
             val => val,

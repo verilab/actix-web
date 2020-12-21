@@ -1,10 +1,8 @@
 //! `Middleware` for conditionally enables another middleware.
-use std::future::ready;
-use std::task::{Context, Poll};
+use core::future::Future;
+use core::task::{Context, Poll};
 
 use actix_service::{Service, Transform};
-use futures_core::future::LocalBoxFuture;
-use futures_util::future::{Either, FutureExt};
 
 /// `Middleware` for conditionally enables another middleware.
 /// The controlled middleware must not change the `Service` interfaces.
@@ -46,20 +44,27 @@ where
     type Error = S::Error;
     type Transform = ConditionMiddleware<T::Transform, S>;
     type InitError = T::InitError;
-    type Future = LocalBoxFuture<'static, Result<Self::Transform, Self::InitError>>;
+    type Future = impl Future<Output = Result<Self::Transform, Self::InitError>>;
 
     fn new_transform(&self, service: S) -> Self::Future {
+        let mut left = None;
+        let mut right = None;
+
         if self.enable {
-            let f = self.trans.new_transform(service).map(|res| {
-                res.map(
-                    ConditionMiddleware::Enable as fn(T::Transform) -> Self::Transform,
-                )
-            });
-            Either::Left(f)
+            left = Some(self.trans.new_transform(service));
         } else {
-            Either::Right(ready(Ok(ConditionMiddleware::Disable(service))))
+            right = Some(Ok(ConditionMiddleware::Disable(service)))
         }
-        .boxed_local()
+
+        async move {
+            match left {
+                Some(fut) => {
+                    let res = fut.await?;
+                    Ok(ConditionMiddleware::Enable(res))
+                }
+                None => right.unwrap(),
+            }
+        }
     }
 }
 
@@ -76,7 +81,7 @@ where
     type Request = E::Request;
     type Response = E::Response;
     type Error = E::Error;
-    type Future = Either<E::Future, D::Future>;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         use ConditionMiddleware::*;
@@ -87,16 +92,27 @@ where
     }
 
     fn call(&self, req: E::Request) -> Self::Future {
-        use ConditionMiddleware::*;
+        let mut left = None;
+        let mut right = None;
+
         match self {
-            Enable(service) => Either::Left(service.call(req)),
-            Disable(service) => Either::Right(service.call(req)),
+            Self::Enable(service) => left = Some(service.call(req)),
+            Self::Disable(service) => right = Some(service.call(req)),
+        }
+
+        async move {
+            match left {
+                Some(left) => left.await,
+                None => right.unwrap().await,
+            }
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use core::future::ready;
+
     use actix_service::IntoService;
 
     use super::*;

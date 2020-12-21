@@ -1,8 +1,6 @@
 //! `Middleware` for compressing response body.
 use std::cmp;
 use std::future::{ready, Future, Ready};
-use std::marker::PhantomData;
-use std::pin::Pin;
 use std::str::FromStr;
 use std::task::{Context, Poll};
 
@@ -11,7 +9,6 @@ use actix_http::encoding::Encoder;
 use actix_http::http::header::{ContentEncoding, ACCEPT_ENCODING};
 use actix_http::Error;
 use actix_service::{Service, Transform};
-use pin_project::pin_project;
 
 use crate::dev::BodyEncoding;
 use crate::service::{ServiceRequest, ServiceResponse};
@@ -83,7 +80,7 @@ where
     type Request = ServiceRequest;
     type Response = ServiceResponse<Encoder<B>>;
     type Error = Error;
-    type Future = CompressResponse<S, B>;
+    type Future = impl Future<Output = Result<ServiceResponse<Encoder<B>>, Error>>;
 
     fn poll_ready(&self, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.service.poll_ready(cx)
@@ -102,50 +99,17 @@ where
             ContentEncoding::Identity
         };
 
-        CompressResponse {
-            encoding,
-            fut: self.service.call(req),
-            _t: PhantomData,
-        }
-    }
-}
+        let fut = self.service.call(req);
 
-#[doc(hidden)]
-#[pin_project]
-pub struct CompressResponse<S, B>
-where
-    S: Service,
-    B: MessageBody,
-{
-    #[pin]
-    fut: S::Future,
-    encoding: ContentEncoding,
-    _t: PhantomData<B>,
-}
+        async move {
+            let res = fut.await?;
+            let enc = if let Some(enc) = res.response().get_encoding() {
+                enc
+            } else {
+                encoding
+            };
 
-impl<S, B> Future for CompressResponse<S, B>
-where
-    B: MessageBody,
-    S: Service<Request = ServiceRequest, Response = ServiceResponse<B>, Error = Error>,
-{
-    type Output = Result<ServiceResponse<Encoder<B>>, Error>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.project();
-
-        match futures_util::ready!(this.fut.poll(cx)) {
-            Ok(resp) => {
-                let enc = if let Some(enc) = resp.response().get_encoding() {
-                    enc
-                } else {
-                    *this.encoding
-                };
-
-                Poll::Ready(Ok(
-                    resp.map_body(move |head, body| Encoder::response(enc, head, body))
-                ))
-            }
-            Err(e) => Poll::Ready(Err(e)),
+            Ok(res.map_body(move |head, body| Encoder::response(enc, head, body)))
         }
     }
 }

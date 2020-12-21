@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use actix_http::error::{Error, ErrorInternalServerError};
 use actix_http::Extensions;
-use futures_util::future::LocalBoxFuture;
+use futures_core::future::LocalBoxFuture;
 
 use crate::dev::Payload;
 use crate::extract::FromRequest;

@@ -10,7 +10,6 @@ use actix_service::boxed::{self, BoxServiceFactory};
 use actix_service::{
     apply, apply_fn_factory, IntoServiceFactory, ServiceFactory, Transform,
 };
-use futures_util::future::FutureExt;
 
 use crate::app_service::{AppEntry, AppInit, AppRoutingFactory};
 use crate::config::ServiceConfig;
@@ -116,22 +115,19 @@ where
         E: std::fmt::Debug,
     {
         self.data_factories.push(Box::new(move || {
-            {
-                let fut = data();
-                async move {
-                    match fut.await {
-                        Err(e) => {
-                            log::error!("Can not construct data instance: {:?}", e);
-                            Err(())
-                        }
-                        Ok(data) => {
-                            let data: Box<dyn DataFactory> = Box::new(Data::new(data));
-                            Ok(data)
-                        }
+            let fut = data();
+            Box::pin(async move {
+                match fut.await {
+                    Err(e) => {
+                        log::error!("Can not construct data instance: {:?}", e);
+                        Err(())
+                    }
+                    Ok(data) => {
+                        let data: Box<dyn DataFactory> = Box::new(Data::new(data));
+                        Ok(data)
                     }
                 }
-            }
-            .boxed_local()
+            })
         }));
         self
     }
@@ -270,11 +266,11 @@ where
     where
         F: IntoServiceFactory<U>,
         U: ServiceFactory<
-                Config = (),
-                Request = ServiceRequest,
-                Response = ServiceResponse,
-                Error = Error,
-            > + 'static,
+            Config = (),
+            Request = ServiceRequest,
+            Response = ServiceResponse,
+            Error = Error,
+        > + 'static,
         U::InitError: fmt::Debug,
     {
         // create and configure default resource

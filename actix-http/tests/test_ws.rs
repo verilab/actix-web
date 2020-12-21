@@ -10,7 +10,6 @@ use actix_http::{body, h1, ws, Error, HttpService, Request, Response};
 use actix_http_test::test_server;
 use actix_rt::net::ServiceStream;
 use actix_service::{fn_factory, Service};
-use actix_utils::dispatcher::Dispatcher;
 use bytes::Bytes;
 use futures_util::future;
 use futures_util::task::{Context, Poll};
@@ -58,7 +57,7 @@ impl<T: ServiceStream> Service for WsService<T> {
                 .await
                 .unwrap();
 
-            Dispatcher::new(framed.replace_codec(ws::Codec::new()), service)
+            ws::InnerDispatcher::new(framed.replace_codec(ws::Codec::new()), service)
                 .await
                 .map_err(|_| panic!())
         };

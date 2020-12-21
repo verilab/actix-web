@@ -18,8 +18,10 @@ mod frame;
 mod mask;
 mod proto;
 
+pub(crate) use self::dispatcher::{FramedDispatcherError};
+
 pub use self::codec::{Codec, Frame, Item, Message};
-pub use self::dispatcher::{Dispatcher, DispatcherError, InnerDispatcher};
+pub use self::dispatcher::{Dispatcher, FramedDispatcher};
 pub use self::frame::Parser;
 pub use self::proto::{hash_key, CloseCode, CloseReason, OpCode};
 

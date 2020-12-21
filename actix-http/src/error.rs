@@ -8,7 +8,6 @@ use std::{fmt, io, result};
 
 use actix_codec::{Decoder, Encoder};
 pub use actix_threadpool::BlockingError;
-use actix_utils::timeout::TimeoutError;
 use bytes::BytesMut;
 use derive_more::{Display, From};
 pub use futures_channel::oneshot::Canceled;
@@ -23,7 +22,8 @@ use crate::body::Body;
 pub use crate::cookie::ParseError as CookieParseError;
 use crate::helpers::Writer;
 use crate::response::{Response, ResponseBuilder};
-use crate::ws::DispatcherError as FramedDispatcherError;
+use crate::ws::FramedDispatcherError;
+use crate::client::TimeoutError;
 
 /// A specialized [`std::result::Result`]
 /// for actix web operations

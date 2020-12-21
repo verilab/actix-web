@@ -8,6 +8,9 @@ mod error;
 mod h1proto;
 mod h2proto;
 mod pool;
+mod timeout;
+
+pub(crate) use timeout::TimeoutError;
 
 pub use self::connection::Connection;
 pub use self::connector::Connector;

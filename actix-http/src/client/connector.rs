@@ -8,7 +8,6 @@ use actix_connect::{
 };
 use actix_rt::net::TcpStream;
 use actix_service::{apply_fn, Service};
-use actix_utils::timeout::{TimeoutError, TimeoutService};
 use http::Uri;
 
 use super::config::ConnectorConfig;
@@ -16,6 +15,7 @@ use super::connection::Connection;
 use super::error::ConnectError;
 use super::pool::{ConnectionPool, Protocol};
 use super::Connect;
+use super::timeout::{TimeoutService, TimeoutError};
 
 #[cfg(feature = "openssl")]
 use actix_connect::ssl::openssl::SslConnector as OpensslConnector;

@@ -57,7 +57,7 @@ impl<T: ServiceStream> Service for WsService<T> {
                 .await
                 .unwrap();
 
-            ws::InnerDispatcher::new(framed.replace_codec(ws::Codec::new()), service)
+            ws::FramedDispatcher::new(framed.replace_codec(ws::Codec::new()), service)
                 .await
                 .map_err(|_| panic!())
         };

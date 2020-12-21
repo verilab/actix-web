@@ -133,24 +133,24 @@ actix-files = { path = "actix-files" }
 awc = { path = "awc" }
 
 # FIXME: remove these override
-#actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-#actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
-actix-codec = { path = "../actix-net-fs/actix-codec" }
-actix-connect = { path = "../actix-net-fs/actix-connect" }
-actix-rt = { path = "../actix-net-fs/actix-rt" }
-actix-server = { path = "../actix-net-fs/actix-server" }
-actix-service = { path = "../actix-net-fs/actix-service" }
-actix-router = { path = "../actix-net-fs/router" }
-actix-testing = { path = "../actix-net-fs/actix-testing" }
-actix-tls = { path = "../actix-net-fs/actix-tls" }
-actix-utils = { path = "../actix-net-fs/actix-utils" }
+actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-server = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-service = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-router = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-testing = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-tls = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
+#actix-codec = { path = "../actix-net-fs/actix-codec" }
+#actix-connect = { path = "../actix-net-fs/actix-connect" }
+#actix-rt = { path = "../actix-net-fs/actix-rt" }
+#actix-server = { path = "../actix-net-fs/actix-server" }
+#actix-service = { path = "../actix-net-fs/actix-service" }
+#actix-router = { path = "../actix-net-fs/router" }
+#actix-testing = { path = "../actix-net-fs/actix-testing" }
+#actix-tls = { path = "../actix-net-fs/actix-tls" }
+#actix-utils = { path = "../actix-net-fs/actix-utils" }
 h2 = { git = "https://github.com/hyperium/h2.git" }
 http = { git = "https://github.com/fakeshadow/http.git" }
 

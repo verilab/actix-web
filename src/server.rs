@@ -250,7 +250,7 @@ where
 
     pub fn on_stop<F2, Fut>(mut self, future: F2) -> Self
     where
-        F2: Fn() -> Fut + 'static,
+        F2: FnOnce() -> Fut + 'static,
         Fut: Future<Output = ()>,
     {
         self.builder = self.builder.on_stop(future);

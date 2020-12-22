@@ -19,11 +19,11 @@ use serde_urlencoded::ser::Error as FormError;
 
 // re-export for convenience
 use crate::body::Body;
+use crate::client::TimeoutError;
 pub use crate::cookie::ParseError as CookieParseError;
 use crate::helpers::Writer;
 use crate::response::{Response, ResponseBuilder};
 use crate::ws::FramedDispatcherError;
-use crate::client::TimeoutError;
 
 /// A specialized [`std::result::Result`]
 /// for actix web operations

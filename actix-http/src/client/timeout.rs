@@ -78,8 +78,8 @@ impl<E> Clone for Timeout<E> {
 }
 
 impl<S, E> Transform<S> for Timeout<E>
-    where
-        S: Service,
+where
+    S: Service,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -101,11 +101,11 @@ impl<S, E> Transform<S> for Timeout<E>
     }
 }
 
-    #[doc(hidden)]
-    pub struct TimeoutFuture<S: Service, E> {
-        service: Option<TimeoutService<S>>,
-        _err: PhantomData<E>,
-    }
+#[doc(hidden)]
+pub struct TimeoutFuture<S: Service, E> {
+    service: Option<TimeoutService<S>>,
+    _err: PhantomData<E>,
+}
 
 impl<S: Service, E> Unpin for TimeoutFuture<S, E> {}
 
@@ -125,12 +125,12 @@ pub struct TimeoutService<S> {
 }
 
 impl<S> TimeoutService<S>
-    where
-        S: Service,
+where
+    S: Service,
 {
     pub fn new<U>(timeout: time::Duration, service: U) -> Self
-        where
-            U: IntoService<S>,
+    where
+        U: IntoService<S>,
     {
         TimeoutService {
             timeout,
@@ -140,8 +140,8 @@ impl<S> TimeoutService<S>
 }
 
 impl<S> Service for TimeoutService<S>
-    where
-        S: Service,
+where
+    S: Service,
 {
     type Request = S::Request;
     type Response = S::Response;
@@ -160,18 +160,18 @@ impl<S> Service for TimeoutService<S>
     }
 }
 
-    /// `TimeoutService` response future
-    #[pin_project::pin_project]
-    #[derive(Debug)]
-    pub struct TimeoutServiceResponse<T: Service> {
-        #[pin]
-        fut: T::Future,
-        sleep: Sleep,
-    }
+/// `TimeoutService` response future
+#[pin_project::pin_project]
+#[derive(Debug)]
+pub struct TimeoutServiceResponse<T: Service> {
+    #[pin]
+    fut: T::Future,
+    sleep: Sleep,
+}
 
 impl<T> Future for TimeoutServiceResponse<T>
-    where
-        T: Service,
+where
+    T: Service,
 {
     type Output = Result<T::Response, TimeoutError<T::Error>>;
 

@@ -267,7 +267,8 @@ where
                     Poll::Ready(Ok(_)) => (),
                     Poll::Ready(Err(err)) => {
                         debug!("Error sending data: {:?}", err);
-                        *this.state = State::FramedError(FramedDispatcherError::Encoder(err));
+                        *this.state =
+                            State::FramedError(FramedDispatcherError::Encoder(err));
                         return true;
                     }
                 }

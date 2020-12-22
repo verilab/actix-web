@@ -14,8 +14,8 @@ use super::config::ConnectorConfig;
 use super::connection::Connection;
 use super::error::ConnectError;
 use super::pool::{ConnectionPool, Protocol};
+use super::timeout::{TimeoutError, TimeoutService};
 use super::Connect;
-use super::timeout::{TimeoutService, TimeoutError};
 
 #[cfg(feature = "openssl")]
 use actix_connect::ssl::openssl::SslConnector as OpensslConnector;

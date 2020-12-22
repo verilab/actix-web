@@ -18,7 +18,7 @@ mod frame;
 mod mask;
 mod proto;
 
-pub(crate) use self::dispatcher::{FramedDispatcherError};
+pub(crate) use self::dispatcher::FramedDispatcherError;
 
 pub use self::codec::{Codec, Frame, Item, Message};
 pub use self::dispatcher::{Dispatcher, FramedDispatcher};

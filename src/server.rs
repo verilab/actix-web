@@ -1,6 +1,8 @@
 use std::{
     any::Any,
-    fmt, io,
+    fmt,
+    future::Future,
+    io,
     marker::PhantomData,
     net,
     sync::{Arc, Mutex},
@@ -243,6 +245,15 @@ where
     /// By default shutdown timeout sets to 30 seconds.
     pub fn shutdown_timeout(mut self, sec: u64) -> Self {
         self.builder = self.builder.shutdown_timeout(sec);
+        self
+    }
+
+    pub fn on_stop<F2, Fut>(mut self, future: F2) -> Self
+    where
+        F2: Fn() -> Fut + 'static,
+        Fut: Future<Output = ()>,
+    {
+        self.builder = self.builder.on_stop(future);
         self
     }
 

@@ -132,6 +132,8 @@ actix-web-codegen = { path = "actix-web-codegen" }
 actix-multipart = { path = "actix-multipart" }
 actix-files = { path = "actix-files" }
 awc = { path = "awc" }
+# FIXME: temporary override.
+actix-server = { git = "https://github.com/actix/actix-net.git", branch = "feat/on_stop_hook" }
 
 [[bench]]
 name = "server"

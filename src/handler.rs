@@ -29,10 +29,12 @@ where
     }
 }
 
+#[doc(hidden)]
 /// Extract arguments from request, run factory function and make response.
 pub struct Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
+    T: FromRequest,
     R: Future<Output = O>,
     T: FromRequest,
     O: Responder,
@@ -44,6 +46,7 @@ where
 impl<F, T, R, O> Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
+    T: FromRequest,
     R: Future<Output = O>,
     T: FromRequest,
     O: Responder,
@@ -59,6 +62,7 @@ where
 impl<F, T, R, O> Clone for Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
+    T: FromRequest,
     R: Future<Output = O>,
     T: FromRequest,
     O: Responder,
@@ -74,6 +78,7 @@ where
 impl<F, T, R, O> ServiceFactory for Handler<F, T, R, O>
 where
     F: Factory<T, R, O>,
+    T: FromRequest,
     R: Future<Output = O>,
     T: FromRequest,
     O: Responder,

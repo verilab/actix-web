@@ -3,12 +3,12 @@ use std::task::{Context, Poll};
 
 use actix_service::Service;
 
-#[doc(hidden)]
 /// Service that allows to turn non-clone service to a service with `Clone` impl
 ///
 /// # Panics
 /// CloneableService might panic with some creative use of thread local storage.
 /// See https://github.com/actix/actix-web/issues/1295 for example
+#[doc(hidden)]
 pub(crate) struct CloneableService<T: Service>(Rc<T>);
 
 impl<T: Service> CloneableService<T> {

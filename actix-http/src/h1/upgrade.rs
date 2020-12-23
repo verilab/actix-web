@@ -1,4 +1,4 @@
-use std::future::Ready;
+use std::future::{ready, Ready};
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
@@ -10,7 +10,7 @@ use crate::error::Error;
 use crate::h1::Codec;
 use crate::request::Request;
 
-pub struct UpgradeHandler<T>(PhantomData<T>);
+pub struct UpgradeHandler<T>(pub(crate) PhantomData<T>);
 
 impl<T: ServiceStream> ServiceFactory for UpgradeHandler<T> {
     type Request = (Request, Framed<T, Codec<T::Runtime>>);
@@ -37,6 +37,6 @@ impl<T: ServiceStream> Service for UpgradeHandler<T> {
     }
 
     fn call(&self, _: Self::Request) -> Self::Future {
-        unimplemented!()
+        ready(Ok(()))
     }
 }

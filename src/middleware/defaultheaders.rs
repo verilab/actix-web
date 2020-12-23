@@ -136,7 +136,6 @@ where
         async move {
             let mut res = fut.await?;
 
-            // set response headers
             for (key, value) in inner.headers.iter() {
                 if !res.headers().contains_key(key) {
                     res.headers_mut().insert(key.clone(), value.clone());
@@ -149,6 +148,7 @@ where
                     HeaderValue::from_static("application/octet-stream"),
                 );
             }
+
             Ok(res)
         }
     }

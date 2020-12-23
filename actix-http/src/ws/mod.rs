@@ -199,13 +199,13 @@ mod tests {
         let req = TestRequest::default().method(Method::POST).finish();
         assert_eq!(
             HandshakeError::GetMethodRequired,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default().finish();
         assert_eq!(
             HandshakeError::NoWebsocketUpgrade,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()
@@ -213,7 +213,7 @@ mod tests {
             .finish();
         assert_eq!(
             HandshakeError::NoWebsocketUpgrade,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()
@@ -224,7 +224,7 @@ mod tests {
             .finish();
         assert_eq!(
             HandshakeError::NoConnectionUpgrade,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()
@@ -239,7 +239,7 @@ mod tests {
             .finish();
         assert_eq!(
             HandshakeError::NoVersionHeader,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()
@@ -258,7 +258,7 @@ mod tests {
             .finish();
         assert_eq!(
             HandshakeError::UnsupportedVersion,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()
@@ -277,7 +277,7 @@ mod tests {
             .finish();
         assert_eq!(
             HandshakeError::BadWebsocketKey,
-            verify_handshake(req.head()).err().unwrap()
+            verify_handshake(req.head()).unwrap_err(),
         );
 
         let req = TestRequest::default()

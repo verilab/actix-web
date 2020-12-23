@@ -52,7 +52,7 @@ actix-utils = "2.0.0"
 
 base64 = "0.13"
 bitflags = "1.2"
-bytes = "0.6"
+bytes = "1"
 cookie = { version = "0.14.1", features = ["percent-encode"] }
 derive_more = "0.99.2"
 either = "1.5.3"
@@ -62,7 +62,7 @@ futures-core = { version = "0.3.5", default-features = false }
 futures-util = { version = "0.3.5", default-features = false, features = ["sink"] }
 fxhash = "0.2.1"
 h2 = "0.3.0"
-http = "0.2.1"
+http = "0.2.2"
 httparse = "1.3"
 indexmap = "1.3"
 itoa = "0.4"

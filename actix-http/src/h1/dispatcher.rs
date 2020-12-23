@@ -113,6 +113,8 @@ where
     messages: VecDeque<DispatcherMessage>,
 
     ka_expire: Instant,
+
+    #[pin]
     ka_timer: Option<<T::Runtime as RuntimeService>::Sleep>,
 
     io: Option<T>,
@@ -677,8 +679,9 @@ where
             // shutdown timeout
             if this.flags.contains(Flags::SHUTDOWN) {
                 if let Some(interval) = this.codec.config().client_disconnect_timer() {
-                    *this.ka_timer =
-                        Some(<T::Runtime as RuntimeService>::sleep_until(interval));
+                    this.ka_timer.set(Some(
+                        <T::Runtime as RuntimeService>::sleep_until(interval),
+                    ));
                 } else {
                     this.flags.insert(Flags::READ_DISCONNECT);
                     if let Some(mut payload) = this.payload.take() {
@@ -691,12 +694,17 @@ where
             }
         }
 
-        match Pin::new(&mut this.ka_timer.as_mut().unwrap()).poll(cx) {
+        match this.ka_timer.as_mut().as_pin_mut().unwrap().poll(cx) {
             Poll::Ready(()) => {
                 // if we get timeout during shutdown, drop connection
                 if this.flags.contains(Flags::SHUTDOWN) {
                     return Err(DispatchError::DisconnectTimeout);
-                } else if this.ka_timer.as_mut().unwrap().sleep_deadline()
+                } else if this
+                    .ka_timer
+                    .as_mut()
+                    .as_pin_mut()
+                    .unwrap()
+                    .sleep_deadline()
                     >= *this.ka_expire
                 {
                     // check for any outstanding tasks
@@ -709,9 +717,15 @@ where
                             if let Some(deadline) =
                                 this.codec.config().client_disconnect_timer()
                             {
-                                if let Some(mut timer) = this.ka_timer.as_mut() {
+                                if let Some(timer) = this.ka_timer.as_mut().as_pin_mut()
+                                {
                                     timer.sleep_reset(deadline);
-                                    let _ = Pin::new(&mut timer).poll(cx);
+                                    let _ = this
+                                        .ka_timer
+                                        .as_mut()
+                                        .as_pin_mut()
+                                        .unwrap()
+                                        .poll(cx);
                                 }
                             } else {
                                 // no shutdown timeout, drop socket
@@ -736,14 +750,15 @@ where
                     } else if let Some(deadline) =
                         this.codec.config().keep_alive_expire()
                     {
-                        if let Some(mut timer) = this.ka_timer.as_mut() {
+                        if let Some(timer) = this.ka_timer.as_mut().as_pin_mut() {
                             timer.sleep_reset(deadline);
-                            let _ = Pin::new(&mut timer).poll(cx);
+                            let _ =
+                                this.ka_timer.as_mut().as_pin_mut().unwrap().poll(cx);
                         }
                     }
-                } else if let Some(mut timer) = this.ka_timer.as_mut() {
+                } else if let Some(timer) = this.ka_timer.as_mut().as_pin_mut() {
                     timer.sleep_reset(*this.ka_expire);
-                    let _ = Pin::new(&mut timer).poll(cx);
+                    let _ = this.ka_timer.as_mut().as_pin_mut().unwrap().poll(cx);
                 }
             }
             Poll::Pending => (),

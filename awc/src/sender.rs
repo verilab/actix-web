@@ -56,7 +56,8 @@ impl Into<SendRequestError> for PrepForSendingError {
 pub enum SendClientRequest {
     Fut(
         Pin<Box<dyn Future<Output = Result<ClientResponse, SendRequestError>>>>,
-        Option<Sleep>,
+        // TODO: pin this sleep.
+        Option<Pin<Box<Sleep>>>,
         bool,
     ),
     Err(Option<SendRequestError>),
@@ -68,7 +69,7 @@ impl SendClientRequest {
         response_decompress: bool,
         timeout: Option<Duration>,
     ) -> SendClientRequest {
-        let delay = timeout.map(sleep);
+        let delay = timeout.map(|t| Box::pin(sleep(t)));
         SendClientRequest::Fut(send, delay, response_decompress)
     }
 }

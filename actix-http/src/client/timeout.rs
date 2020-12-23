@@ -166,6 +166,7 @@ where
 pub struct TimeoutServiceResponse<T: Service> {
     #[pin]
     fut: T::Future,
+    #[pin]
     sleep: Sleep,
 }
 
@@ -176,7 +177,7 @@ where
     type Output = Result<T::Response, TimeoutError<T::Error>>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let mut this = self.project();
+        let this = self.project();
 
         // First, try polling the future
         match this.fut.poll(cx) {
@@ -186,7 +187,7 @@ where
         }
 
         // Now check the sleep
-        match Pin::new(&mut this.sleep).poll(cx) {
+        match this.sleep.poll(cx) {
             Poll::Pending => Poll::Pending,
             Poll::Ready(_) => Poll::Ready(Err(TimeoutError::Timeout)),
         }

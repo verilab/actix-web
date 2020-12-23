@@ -87,7 +87,7 @@ actix-web-codegen = "0.4.0"
 actix-http = "2.2.0"
 awc = { version = "2.0.3", default-features = false }
 
-bytes = "0.6"
+bytes = "1"
 derive_more = "0.99.5"
 encoding_rs = "0.8"
 futures-channel = { version = "0.3.5", default-features = false }
@@ -133,6 +133,7 @@ actix-files = { path = "actix-files" }
 awc = { path = "awc" }
 
 # FIXME: remove these override
+actix = { git = "https://github.com/fakeshadow/actix", branch = "tokio-0.3" }
 actix-codec = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-connect = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
 actix-rt = { git = "https://github.com/fakeshadow/actix-net", branch = "master" }
@@ -151,7 +152,6 @@ actix-utils = { git = "https://github.com/fakeshadow/actix-net", branch = "maste
 #actix-testing = { path = "../actix-net-fs/actix-testing" }
 #actix-tls = { path = "../actix-net-fs/actix-tls" }
 #actix-utils = { path = "../actix-net-fs/actix-utils" }
-h2 = { git = "https://github.com/hyperium/h2.git" }
 http = { git = "https://github.com/fakeshadow/http.git" }
 
 [[bench]]

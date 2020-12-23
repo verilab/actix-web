@@ -66,8 +66,12 @@
 //! * `secure-cookies` - secure cookies support
 
 #![deny(rust_2018_idioms)]
-#![allow(clippy::needless_doctest_main, clippy::type_complexity)]
-#![feature(type_alias_impl_trait)]
+#![allow(
+    clippy::needless_doctest_main,
+    clippy::type_complexity,
+    incomplete_features
+)]
+#![feature(type_alias_impl_trait, generic_associated_types)]
 #![doc(html_logo_url = "https://actix.rs/img/logo.png")]
 #![doc(html_favicon_url = "https://actix.rs/favicon.ico")]
 

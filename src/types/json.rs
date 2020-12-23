@@ -123,9 +123,9 @@ where
 
 impl<T: Serialize> Responder for Json<T> {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         let body = match serde_json::to_string(&self.0) {
             Ok(body) => body,
             Err(e) => return ready(Err(e.into())),
@@ -174,22 +174,21 @@ where
     T: DeserializeOwned + 'static,
 {
     type Error = Error;
-    type Future = impl Future<Output = Result<Json<T>, Error>>;
+    type Future<'f> = impl Future<Output = Result<Json<T>, Error>>;
     type Config = JsonConfig;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let config = JsonConfig::from_req(req);
-
-        let limit = config.limit;
-        let ctype = config.content_type.clone();
-        let err_handler = config.err_handler.clone();
-
-        let fut = JsonBody::new(req, payload, ctype).limit(limit);
-        let req = req.clone();
-
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut Payload,
+    ) -> Self::Future<'a> {
         async move {
-            match fut.await {
+            let config = JsonConfig::from_req(req);
+            let limit = config.limit;
+            let ctype = config.content_type.as_deref();
+            let err_handler = &config.err_handler;
+
+            match JsonBody::new(req, payload, ctype).limit(limit).await {
                 Ok(data) => Ok(Json(data)),
                 Err(e) => {
                     log::debug!(
@@ -199,7 +198,7 @@ where
                     );
 
                     if let Some(err) = err_handler.as_ref() {
-                        Err((*err)(e, &req))
+                        Err((*err)(e, req))
                     } else {
                         Err(e.into())
                     }
@@ -337,7 +336,7 @@ where
     pub fn new(
         req: &HttpRequest,
         payload: &mut Payload,
-        ctype: Option<Arc<dyn Fn(mime::Mime) -> bool + Send + Sync>>,
+        ctype: Option<&(dyn Fn(mime::Mime) -> bool + Send + Sync)>,
     ) -> Self {
         // check content-type
         let json = if let Ok(Some(mime)) = req.mime_type() {

@@ -3,7 +3,7 @@ use core::future::Future;
 use actix_http::{Error, Response};
 use bytes::Bytes;
 
-use crate::{dev, request::HttpRequest, FromRequest, Responder};
+use crate::{dev, request::HttpRequest, FromRequest, Responder, ResponseError};
 
 /// Combines two different responder types into a single type
 ///
@@ -60,23 +60,20 @@ impl<A, B> Either<A, B> {
 impl<A, B> Responder for Either<A, B>
 where
     A: Responder,
+    A::Error: ResponseError + 'static,
     B: Responder,
+    B::Error: ResponseError + 'static,
 {
     type Error = Error;
-    type Future = impl Future<Output = Result<Response, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        let mut left = None;
-        let mut right = None;
-        match self {
-            Either::A(a) => left = Some(a.respond_to(req)),
-            Either::B(b) => right = Some(b.respond_to(req)),
-        };
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            match left {
-                Some(left) => left.await.map_err(Into::into),
-                None => right.unwrap().await.map_err(Into::into),
-            }
+            let res = match self {
+                Either::A(a) => a.respond_to(req).await?,
+                Either::B(b) => b.respond_to(req).await?,
+            };
+            Ok(res)
         }
     }
 }
@@ -114,44 +111,46 @@ where
 /// as part of its implementation. Though, it does respect a `PayloadConfig`'s maximum size limit.
 impl<A, B> FromRequest for Either<A, B>
 where
-    A: FromRequest + 'static,
-    B: FromRequest + 'static,
+    A: FromRequest,
+    B: FromRequest,
 {
     type Error = EitherExtractError<A::Error, B::Error>;
-    type Future = impl Future<Output = Result<Self, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Self::Error>>;
     type Config = ();
 
-    fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
-        let req2 = req.clone();
-        let fut = Bytes::from_request(req, payload);
-
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut dev::Payload,
+    ) -> Self::Future<'a> {
         async move {
-            let bytes = fut.await.map_err(EitherExtractError::Bytes)?;
-            bytes_to_a_or_b(req2, bytes).await
+            let bytes = Bytes::from_request(req, payload)
+                .await
+                .map_err(EitherExtractError::Bytes)?;
+            bytes_to_a_or_b(req, bytes).await
         }
     }
 }
 
 async fn bytes_to_a_or_b<A, B>(
-    req: HttpRequest,
+    req: &HttpRequest,
     bytes: Bytes,
 ) -> Result<Either<A, B>, EitherExtractError<A::Error, B::Error>>
 where
-    A: FromRequest + 'static,
-    B: FromRequest + 'static,
+    A: FromRequest,
+    B: FromRequest,
 {
     let fallback = bytes.clone();
     let a_err;
 
     let mut pl = payload_from_bytes(bytes);
-    match A::from_request(&req, &mut pl).await {
+    match A::from_request(req, &mut pl).await {
         Ok(a_data) => return Ok(Either::A(a_data)),
         // store A's error for returning if B also fails
         Err(err) => a_err = err,
     };
 
     let mut pl = payload_from_bytes(fallback);
-    match B::from_request(&req, &mut pl).await {
+    match B::from_request(req, &mut pl).await {
         Ok(b_data) => return Ok(Either::B(b_data)),
         Err(b_err) => Err(EitherExtractError::Extract(a_err, b_err)),
     }

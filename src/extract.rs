@@ -1,7 +1,5 @@
 //! Request extractors
 use std::future::{ready, Future, Ready};
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 use actix_http::error::Error;
 
@@ -16,20 +14,26 @@ pub trait FromRequest: Sized {
     type Error: Into<Error>;
 
     /// Future that resolves to a Self
-    type Future: Future<Output = Result<Self, Self::Error>>;
+    type Future<'f>: Future<Output = Result<Self, Self::Error>>;
 
     /// Configuration for this extractor
     type Config: Default + 'static;
 
     /// Convert request to a Self
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future;
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut Payload,
+    ) -> Self::Future<'a>;
 
-    /// Convert request to a Self
-    ///
-    /// This method uses `Payload::None` as payload stream.
-    fn extract(req: &HttpRequest) -> Self::Future {
-        Self::from_request(req, &mut Payload::None)
-    }
+    // /// Convert request to a Self
+    // ///
+    // /// This method uses `Payload::None` as payload stream.
+    // fn extract(req: &HttpRequest) -> Self::FutureEtract<'_> {
+    //     let payload = &mut Payload::None;
+    //     async move {
+    //         Self::from_request(req, payload).await
+    //     }
+    // }
 
     /// Create and configure config instance.
     fn configure<F>(f: F) -> Self::Config
@@ -47,6 +51,8 @@ pub trait FromRequest: Sized {
 /// ## Example
 ///
 /// ```rust
+/// #![feature(generic_associated_types)]
+///
 /// use actix_web::{web, dev, App, Error, HttpRequest, FromRequest};
 /// use actix_web::error::ErrorBadRequest;
 /// use futures_util::future::{ok, err, Ready};
@@ -60,10 +66,10 @@ pub trait FromRequest: Sized {
 ///
 /// impl FromRequest for Thing {
 ///     type Error = Error;
-///     type Future = Ready<Result<Self, Self::Error>>;
+///     type Future<'f> = Ready<Result<Self, Self::Error>>;
 ///     type Config = ();
 ///
-///     fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
+///     fn from_request<'a>(req: &'a HttpRequest, payload: &'a mut dev::Payload) -> Self::Future<'a> {
 ///         if rand::random() {
 ///             ok(Thing { name: "thingy".into() })
 ///         } else {
@@ -89,20 +95,18 @@ pub trait FromRequest: Sized {
 ///     );
 /// }
 /// ```
-impl<T: 'static> FromRequest for Option<T>
-where
-    T: FromRequest,
-    T::Future: 'static,
-{
+impl<T: FromRequest> FromRequest for Option<T> {
     type Error = Error;
-    type Future = impl Future<Output = Result<Self, Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Error>>;
     type Config = T::Config;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let fut = T::from_request(req, payload);
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut Payload,
+    ) -> Self::Future<'a> {
         async move {
-            match fut.await {
+            match T::from_request(req, payload).await {
                 Ok(t) => Ok(Some(t)),
                 Err(e) => {
                     log::debug!("Error for Option<T> extractor: {}", e.into());
@@ -120,6 +124,8 @@ where
 /// ## Example
 ///
 /// ```rust
+/// #![feature(generic_associated_types)]
+///
 /// use actix_web::{web, dev, App, Result, Error, HttpRequest, FromRequest};
 /// use actix_web::error::ErrorBadRequest;
 /// use futures_util::future::{ok, err, Ready};
@@ -133,10 +139,10 @@ where
 ///
 /// impl FromRequest for Thing {
 ///     type Error = Error;
-///     type Future = Ready<Result<Thing, Error>>;
+///     type Future<'f> = Ready<Result<Thing, Error>>;
 ///     type Config = ();
 ///
-///     fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
+///     fn from_request<'a>(req: &'a HttpRequest, payload: &'a mut dev::Payload) -> Self::Future<'a> {
 ///         if rand::random() {
 ///             ok(Thing { name: "thingy".into() })
 ///         } else {
@@ -159,21 +165,18 @@ where
 ///     );
 /// }
 /// ```
-impl<T> FromRequest for Result<T, T::Error>
-where
-    T: FromRequest + 'static,
-    T::Error: 'static,
-    T::Future: 'static,
-{
+impl<T: FromRequest> FromRequest for Result<T, T::Error> {
     type Error = Error;
-    type Future = impl Future<Output = Result<Self, Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Error>>;
     type Config = T::Config;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let fut = T::from_request(req, payload);
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut Payload,
+    ) -> Self::Future<'a> {
         async move {
-            let res = fut.await;
+            let res = T::from_request(req, payload).await;
             Ok(res)
         }
     }
@@ -182,10 +185,10 @@ where
 #[doc(hidden)]
 impl FromRequest for () {
     type Error = Error;
-    type Future = Ready<Result<(), Error>>;
+    type Future<'f> = Ready<Result<(), Error>>;
     type Config = ();
 
-    fn from_request(_: &HttpRequest, _: &mut Payload) -> Self::Future {
+    fn from_request<'a>(_: &'a HttpRequest, _: &'a mut Payload) -> Self::Future<'a> {
         ready(Ok(()))
     }
 }
@@ -206,68 +209,36 @@ macro_rules! tuple_from_req ({$fut_type:ident, $(($n:tt, $T:ident)),+} => {
     // weird trick.
     #[allow(non_snake_case)]
     mod $fut_type {
-
         // Bring everything into scope, so we don't need
         // redundant imports
-        use super::*;
+        use core::future::Future;
 
-        /// A helper struct to allow us to pin-project through
-        /// to individual fields
-        #[pin_project::pin_project]
-        struct FutWrapper<$($T: FromRequest),+>($(#[pin] $T::Future),+);
+        use actix_http::error::Error;
+
+        use super::FromRequest;
+
+        use crate::dev::Payload;
+        use crate::request::HttpRequest;
 
         /// FromRequest implementation for tuple
         #[doc(hidden)]
         #[allow(unused_parens)]
-        impl<$($T: FromRequest + 'static),+> FromRequest for ($($T,)+)
-        {
+        impl<$($T: FromRequest + 'static),+> FromRequest for ($($T,)+) {
             type Error = Error;
-            type Future = $fut_type<$($T),+>;
+            type Future<'f> = impl Future<Output = Result<($($T,)+), Self::Error>>;
             type Config = ($($T::Config),+);
 
-            fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-                $fut_type {
-                    items: <($(Option<$T>,)+)>::default(),
-                    futs: FutWrapper($($T::from_request(req, payload),)+),
+            fn from_request<'a>(req: &'a HttpRequest, payload: &'a mut Payload) -> Self::Future<'a> {
+                let mut items = <($(Option<$T>,)+)>::default();
+
+                async move {
+                    $(
+                        let res = $T::from_request(req, payload).await.map_err(Into::into)?;
+                        items.$n = Some(res);
+                    )+
+
+                    Ok(($(items.$n.take().unwrap(),)+))
                 }
-            }
-        }
-
-        #[doc(hidden)]
-        #[pin_project::pin_project]
-        pub struct $fut_type<$($T: FromRequest),+> {
-            items: ($(Option<$T>,)+),
-            #[pin]
-            futs: FutWrapper<$($T,)+>,
-        }
-
-        impl<$($T: FromRequest),+> Future for $fut_type<$($T),+>
-        {
-            type Output = Result<($($T,)+), Error>;
-
-            fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-                let mut this = self.project();
-
-                let mut ready = true;
-                $(
-                    if this.items.$n.is_none() {
-                        match this.futs.as_mut().project().$n.poll(cx) {
-                            Poll::Ready(Ok(item)) => {
-                                this.items.$n = Some(item);
-                            }
-                            Poll::Pending => ready = false,
-                            Poll::Ready(Err(e)) => return Poll::Ready(Err(e.into())),
-                        }
-                    }
-                )+
-
-                    if ready {
-                        Poll::Ready(Ok(
-                            ($(this.items.$n.take().unwrap(),)+)
-                        ))
-                    } else {
-                        Poll::Pending
-                    }
             }
         }
     }

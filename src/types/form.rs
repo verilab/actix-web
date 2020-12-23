@@ -113,32 +113,32 @@ impl<T> ops::DerefMut for Form<T> {
 
 impl<T> FromRequest for Form<T>
 where
-    T: DeserializeOwned + 'static,
+    T: DeserializeOwned,
 {
     type Error = Error;
-    type Future = impl Future<Output = Result<Self, Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Error>>;
     type Config = FormConfig;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut Payload) -> Self::Future {
-        let (limit, err) = req
-            .app_data::<Self::Config>()
-            .or_else(|| {
-                req.app_data::<web::Data<Self::Config>>()
-                    .map(|d| d.as_ref())
-            })
-            .map(|c| (c.limit, c.err_handler.clone()))
-            .unwrap_or((16384, None));
-
-        let fut = UrlEncoded::new(req, payload).limit(limit);
-        let req = req.clone();
-
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut Payload,
+    ) -> Self::Future<'a> {
         async move {
-            match fut.await {
+            let (limit, err) = req
+                .app_data::<Self::Config>()
+                .or_else(|| {
+                    req.app_data::<web::Data<Self::Config>>()
+                        .map(|d| d.as_ref())
+                })
+                .map(|c| (c.limit, c.err_handler.as_deref()))
+                .unwrap_or((16384, None));
+
+            match UrlEncoded::new(req, payload).limit(limit).await {
                 Ok(item) => Ok(Form(item)),
                 Err(e) => {
                     if let Some(err) = err {
-                        Err((*err)(e, &req))
+                        Err(err(e, req))
                     } else {
                         Err(e.into())
                     }
@@ -162,9 +162,9 @@ impl<T: fmt::Display> fmt::Display for Form<T> {
 
 impl<T: Serialize> Responder for Form<T> {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         let body = match serde_urlencoded::to_string(&self.0) {
             Ok(body) => body,
             Err(e) => return ready(Err(e.into())),
@@ -348,7 +348,7 @@ impl<U> UrlEncoded<U> {
 
 impl<U> Future for UrlEncoded<U>
 where
-    U: DeserializeOwned + 'static,
+    U: DeserializeOwned,
 {
     type Output = Result<U, UrlencodedError>;
 

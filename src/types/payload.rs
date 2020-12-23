@@ -7,7 +7,7 @@ use std::task::{Context, Poll};
 use actix_http::error::{Error, ErrorBadRequest, PayloadError};
 use actix_http::HttpMessage;
 use bytes::{Bytes, BytesMut};
-use encoding_rs::{Encoding, UTF_8};
+use encoding_rs::UTF_8;
 use futures_core::ready;
 use futures_core::stream::Stream;
 use mime::Mime;
@@ -97,11 +97,14 @@ impl Stream for Payload {
 /// ```
 impl FromRequest for Payload {
     type Error = Error;
-    type Future = Ready<Result<Payload, Error>>;
+    type Future<'f> = Ready<Result<Payload, Error>>;
     type Config = PayloadConfig;
 
     #[inline]
-    fn from_request(_: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
+    fn from_request<'a>(
+        _: &'a HttpRequest,
+        payload: &'a mut dev::Payload,
+    ) -> Self::Future<'a> {
         ready(Ok(Payload(payload.take())))
     }
 }
@@ -133,20 +136,21 @@ impl FromRequest for Payload {
 /// ```
 impl FromRequest for Bytes {
     type Error = Error;
-    type Future = impl Future<Output = Result<Self, Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Error>>;
     type Config = PayloadConfig;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
-        // allow both Config and Data<Config>
-        let cfg = PayloadConfig::from_req(req);
-        let err = cfg.check_mimetype(req);
-        let limit = cfg.limit;
-        let fut = HttpMessageBody::new(req, payload).limit(limit);
-
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut dev::Payload,
+    ) -> Self::Future<'a> {
         async move {
-            err?;
-            Ok(fut.await?)
+            // allow both Config and Data<Config>
+            let cfg = PayloadConfig::from_req(req);
+            cfg.check_mimetype(req)?;
+            let limit = cfg.limit;
+            let res = HttpMessageBody::new(req, payload).limit(limit).await?;
+            Ok(res)
         }
     }
 }
@@ -180,40 +184,37 @@ impl FromRequest for Bytes {
 /// ```
 impl FromRequest for String {
     type Error = Error;
-    type Future = impl Future<Output = Result<Self, Error>>;
+    type Future<'f> = impl Future<Output = Result<Self, Error>>;
     type Config = PayloadConfig;
 
     #[inline]
-    fn from_request(req: &HttpRequest, payload: &mut dev::Payload) -> Self::Future {
-        let cfg = PayloadConfig::from_req(req);
-
-        // check content-type
-        let err = cfg.check_mimetype(req);
-
-        // check charset
-        let encoding = req.encoding();
-        let limit = cfg.limit;
-        let fut = HttpMessageBody::new(req, payload).limit(limit);
-
+    fn from_request<'a>(
+        req: &'a HttpRequest,
+        payload: &'a mut dev::Payload,
+    ) -> Self::Future<'a> {
         async move {
-            err?;
-            let encoding = encoding?;
-            let body = fut.await?;
-            bytes_to_string(body, encoding)
-        }
-    }
-}
+            let cfg = PayloadConfig::from_req(req);
 
-fn bytes_to_string(body: Bytes, encoding: &'static Encoding) -> Result<String, Error> {
-    if encoding == UTF_8 {
-        Ok(str::from_utf8(body.as_ref())
-            .map_err(|_| ErrorBadRequest("Can not decode body"))?
-            .to_owned())
-    } else {
-        Ok(encoding
-            .decode_without_bom_handling_and_without_replacement(&body)
-            .map(|s| s.into_owned())
-            .ok_or_else(|| ErrorBadRequest("Can not decode body"))?)
+            // check content-type
+            cfg.check_mimetype(req)?;
+
+            // check charset
+            let encoding = req.encoding()?;
+
+            let limit = cfg.limit;
+            let body = HttpMessageBody::new(req, payload).limit(limit).await?;
+
+            if encoding == UTF_8 {
+                Ok(str::from_utf8(body.as_ref())
+                    .map_err(|_| ErrorBadRequest("Can not decode body"))?
+                    .to_owned())
+            } else {
+                Ok(encoding
+                    .decode_without_bom_handling_and_without_replacement(&body)
+                    .map(|s| s.into_owned())
+                    .ok_or_else(|| ErrorBadRequest("Can not decode body"))?)
+            }
+        }
     }
 }
 

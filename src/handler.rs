@@ -2,7 +2,7 @@ use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::task::{Context, Poll};
 
-use actix_http::{Error, Response};
+use actix_http::Error;
 use actix_service::{Service, ServiceFactory};
 
 use crate::extract::FromRequest;
@@ -116,17 +116,16 @@ where
             match T::from_request(&req, &mut payload).await {
                 Ok(item) => {
                     // pass item to handler function and call Responder on the return type.
-                    let res = handle.call(item).await.respond_to(&req).await;
+                    let res = handle
+                        .call(item)
+                        .await
+                        .respond_to(&req)
+                        .await
+                        .unwrap_or_else(|e| e.into().into());
 
                     // always return a ServiceResponse type and Error type is a placeholder type
                     // that never used.
-                    match res {
-                        Ok(res) => Ok(ServiceResponse::new(req, res)),
-                        Err(e) => {
-                            let res: Response = e.into().into();
-                            Ok(ServiceResponse::new(req, res))
-                        }
-                    }
+                    Ok(ServiceResponse::new(req, res))
                 }
                 Err(e) => {
                     let req = ServiceRequest::new(req);

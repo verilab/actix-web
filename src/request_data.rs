@@ -64,12 +64,12 @@ impl<T: Clone + 'static> Deref for ReqData<T> {
     }
 }
 
-impl<T: Clone + 'static> FromRequest for ReqData<T> {
+impl<T: Clone> FromRequest for ReqData<T> {
     type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
+    type Future<'f> = Ready<Result<Self, Error>>;
     type Config = ();
 
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+    fn from_request<'a>(req: &'a HttpRequest, _: &'a mut Payload) -> Self::Future<'a> {
         if let Some(st) = req.extensions().get::<T>() {
             ready(Ok(ReqData(st.clone())))
         } else {

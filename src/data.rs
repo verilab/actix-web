@@ -104,11 +104,11 @@ impl<T: ?Sized> From<Arc<T>> for Data<T> {
 
 impl<T: ?Sized + 'static> FromRequest for Data<T> {
     type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
+    type Future<'f> = Ready<Result<Self, Error>>;
     type Config = ();
 
     #[inline]
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+    fn from_request<'a>(req: &'a HttpRequest, _: &'a mut Payload) -> Self::Future<'a> {
         if let Some(st) = req.app_data::<Data<T>>() {
             ready(Ok(st.clone()))
         } else {

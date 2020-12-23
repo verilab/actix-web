@@ -309,11 +309,11 @@ impl Drop for HttpRequest {
 /// ```
 impl FromRequest for HttpRequest {
     type Error = Error;
-    type Future = Ready<Result<Self, Error>>;
+    type Future<'f> = Ready<Result<Self, Error>>;
     type Config = ();
 
     #[inline]
-    fn from_request(req: &HttpRequest, _: &mut Payload) -> Self::Future {
+    fn from_request<'a>(req: &'a HttpRequest, _: &'a mut Payload) -> Self::Future<'a> {
         ready(Ok(req.clone()))
     }
 }

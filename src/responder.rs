@@ -18,10 +18,10 @@ pub trait Responder {
     type Error: Into<Error>;
 
     /// The future response value.
-    type Future: Future<Output = Result<Response, Self::Error>>;
+    type Future<'f>: Future<Output = Result<Response, Self::Error>>;
 
     /// Convert itself to `AsyncResult` or `Error`.
-    fn respond_to(self, req: &HttpRequest) -> Self::Future;
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_>;
 
     /// Override a status code for a Responder.
     ///
@@ -72,10 +72,10 @@ pub trait Responder {
 
 impl Responder for Response {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
     #[inline]
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(self))
     }
 }
@@ -85,13 +85,12 @@ where
     T: Responder,
 {
     type Error = T::Error;
-    type Future = impl Future<Output = Result<Response, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        let fut = self.map(|t| t.respond_to(req));
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            match fut {
-                Some(f) => f.await,
+            match self {
+                Some(resp) => resp.respond_to(req).await,
                 None => Ok(Response::build(StatusCode::NOT_FOUND).finish()),
             }
         }
@@ -104,19 +103,13 @@ where
     E: Into<Error>,
 {
     type Error = Error;
-    type Future = impl Future<Output = Result<Response, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        let mut left = None;
-        let mut right = None;
-        match self {
-            Ok(val) => left = Some(val.respond_to(req)),
-            Err(e) => right = Some(Err(e.into())),
-        };
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            match left {
-                Some(left) => left.await.map_err(Into::into),
-                None => right.unwrap(),
+            match self {
+                Ok(val) => val.respond_to(req).await.map_err(Into::into),
+                Err(e) => Err(e.into()),
             }
         }
     }
@@ -124,10 +117,10 @@ where
 
 impl Responder for ResponseBuilder {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
     #[inline]
-    fn respond_to(mut self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(mut self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(self.finish()))
     }
 }
@@ -137,13 +130,12 @@ where
     T: Responder,
 {
     type Error = T::Error;
-    type Future = impl Future<Output = Result<Response, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        let fut = self.0.respond_to(req);
-        let status = self.1;
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            let mut res = fut.await?;
+            let (resp, status) = self;
+            let mut res = resp.respond_to(req).await?;
             *res.status_mut() = status;
             Ok(res)
         }
@@ -152,9 +144,9 @@ where
 
 impl Responder for &'static str {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
             .body(self)))
@@ -163,9 +155,9 @@ impl Responder for &'static str {
 
 impl Responder for &'static [u8] {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
             .body(self)))
@@ -174,9 +166,9 @@ impl Responder for &'static [u8] {
 
 impl Responder for String {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
             .body(self)))
@@ -185,9 +177,9 @@ impl Responder for String {
 
 impl<'a> Responder for &'a String {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("text/plain; charset=utf-8")
             .body(self)))
@@ -196,9 +188,9 @@ impl<'a> Responder for &'a String {
 
 impl Responder for Bytes {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
             .body(self)))
@@ -207,9 +199,9 @@ impl Responder for Bytes {
 
 impl Responder for BytesMut {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Response::build(StatusCode::OK)
             .content_type("application/octet-stream")
             .body(self)))
@@ -293,14 +285,14 @@ impl<T: Responder> CustomResponder<T> {
 
 impl<T: Responder> Responder for CustomResponder<T> {
     type Error = T::Error;
-    type Future = impl Future<Output = Result<Response, Self::Error>>;
+    type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
-    fn respond_to(self, req: &HttpRequest) -> Self::Future {
-        let fut = self.responder.respond_to(req);
-        let mut status = self.status;
-        let headers = self.headers;
+    fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            let mut res = fut.await?;
+            let mut status = self.status;
+            let headers = self.headers;
+
+            let mut res = self.responder.respond_to(req).await?;
             if let Some(status) = status.take() {
                 *res.status_mut() = status;
             }
@@ -319,9 +311,9 @@ where
     T: std::fmt::Debug + std::fmt::Display + 'static,
 {
     type Error = Error;
-    type Future = Ready<Result<Response, Error>>;
+    type Future<'f> = Ready<Result<Response, Error>>;
 
-    fn respond_to(self, _: &HttpRequest) -> Self::Future {
+    fn respond_to(self, _: &HttpRequest) -> Self::Future<'_> {
         ready(Ok(Error::from(self).into()))
     }
 }

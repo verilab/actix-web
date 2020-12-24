@@ -1,6 +1,7 @@
 //! HTTP primitives for the Actix ecosystem.
 
 #![deny(rust_2018_idioms)]
+#![feature(type_alias_impl_trait)]
 #![allow(
     clippy::type_complexity,
     clippy::too_many_arguments,

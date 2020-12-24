@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::future::{ready, Future, Ready};
 use std::marker::PhantomData;
 use std::pin::Pin;
 use std::rc::Rc;
@@ -9,7 +9,7 @@ use actix_codec::Framed;
 use actix_rt::net::ServiceStream;
 use actix_service::{pipeline_factory, IntoServiceFactory, Service, ServiceFactory};
 use futures_core::ready;
-use futures_util::future::{ok, Ready};
+use futures_util::StreamExt;
 
 use crate::body::MessageBody;
 use crate::cloneable::CloneableService;
@@ -92,7 +92,7 @@ where
     > {
         pipeline_factory(|io: T| {
             let peer_addr = io.peer_addr();
-            ok((io, peer_addr))
+            ready(Ok((io, peer_addr)))
         })
         .and_then(self)
     }
@@ -142,7 +142,7 @@ mod openssl {
             )
             .and_then(|io: SslStream<T>| {
                 let peer_addr = io.peer_addr();
-                ok((io, peer_addr))
+                ready(Ok((io, peer_addr)))
             })
             .and_then(self.map_err(TlsError::Service))
         }
@@ -193,7 +193,7 @@ mod rustls {
             )
             .and_then(|io: TlsStream<T>| {
                 let peer_addr = io.peer_addr();
-                ok((io, peer_addr))
+                ready(Ok((io, peer_addr)))
             })
             .and_then(self.map_err(TlsError::Service))
         }
@@ -524,10 +524,7 @@ pub struct OneRequest<T: ServiceStream> {
     config: ServiceConfig<T::Runtime>,
 }
 
-impl<T> OneRequest<T>
-where
-    T: ServiceStream,
-{
+impl<T: ServiceStream> OneRequest<T> {
     /// Create new `H1SimpleService` instance.
     pub fn new() -> Self {
         OneRequest {
@@ -536,10 +533,7 @@ where
     }
 }
 
-impl<T> ServiceFactory for OneRequest<T>
-where
-    T: ServiceStream,
-{
+impl<T: ServiceStream> ServiceFactory for OneRequest<T> {
     type Request = T;
     type Response = (Request, Framed<T, Codec<T::Runtime>>);
     type Error = ParseError;
@@ -549,70 +543,39 @@ where
     type Future = Ready<Result<Self::Service, Self::InitError>>;
 
     fn new_service(&self, _: ()) -> Self::Future {
-        ok(OneRequestService {
+        ready(Ok(OneRequestService {
             config: self.config.clone(),
-        })
+        }))
     }
 }
 
 /// `Service` implementation for HTTP1 transport. Reads one request and returns
 /// request and framed object.
-pub struct OneRequestService<T>
-where
-    T: ServiceStream,
-{
+pub struct OneRequestService<T: ServiceStream> {
     config: ServiceConfig<T::Runtime>,
 }
 
-impl<T> Service for OneRequestService<T>
-where
-    T: ServiceStream,
-{
+impl<T: ServiceStream> Service for OneRequestService<T> {
     type Request = T;
     type Response = (Request, Framed<T, Codec<T::Runtime>>);
     type Error = ParseError;
-    type Future = OneRequestServiceResponse<T>;
+    type Future = impl Future<Output = Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&self, _: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
     fn call(&self, req: Self::Request) -> Self::Future {
-        OneRequestServiceResponse {
-            framed: Some(Framed::new(req, Codec::new(self.config.clone()))),
-        }
-    }
-}
-
-#[doc(hidden)]
-#[pin_project::pin_project]
-pub struct OneRequestServiceResponse<T>
-where
-    T: ServiceStream,
-{
-    #[pin]
-    framed: Option<Framed<T, Codec<T::Runtime>>>,
-}
-
-impl<T> Future for OneRequestServiceResponse<T>
-where
-    T: ServiceStream,
-{
-    type Output = Result<(Request, Framed<T, Codec<T::Runtime>>), ParseError>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = self.as_mut().project();
-
-        match ready!(this.framed.as_pin_mut().unwrap().next_item(cx)) {
-            Some(Ok(req)) => match req {
-                Message::Item(req) => {
-                    let mut this = self.as_mut().project();
-                    Poll::Ready(Ok((req, this.framed.take().unwrap())))
-                }
-                Message::Chunk(_) => unreachable!("Something is wrong"),
-            },
-            Some(Err(err)) => Poll::Ready(Err(err)),
-            None => Poll::Ready(Err(ParseError::Incomplete)),
+        let mut framed = Framed::new(req, Codec::new(self.config.clone()));
+        async move {
+            match framed.next().await {
+                Some(Ok(msg)) => match msg {
+                    Message::Item(req) => Ok((req, framed)),
+                    Message::Chunk(_) => unreachable!("Something is wrong"),
+                },
+                Some(Err(err)) => Err(err),
+                None => Err(ParseError::Incomplete),
+            }
         }
     }
 }

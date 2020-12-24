@@ -318,6 +318,17 @@ impl FromRequest for HttpRequest {
     }
 }
 
+// impl<'h> FromRequest for &'h HttpRequest {
+//     type Error = Error;
+//     type Future<'f> = Ready<Result<Self, Error>>;
+//     type Config = ();
+//
+//     #[inline]
+//     fn from_request<'a>(req: &'a HttpRequest, _: &'a mut Payload) -> Self::Future<'a> {
+//         ready(Ok(req))
+//     }
+// }
+
 impl fmt::Debug for HttpRequest {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(

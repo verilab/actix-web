@@ -3,7 +3,7 @@ use core::future::Future;
 use actix_http::{Error, Response};
 use bytes::Bytes;
 
-use crate::{dev, request::HttpRequest, FromRequest, Responder, ResponseError};
+use crate::{dev, request::HttpRequest, FromRequest, Responder};
 
 /// Combines two different responder types into a single type
 ///
@@ -60,20 +60,17 @@ impl<A, B> Either<A, B> {
 impl<A, B> Responder for Either<A, B>
 where
     A: Responder,
-    A::Error: ResponseError + 'static,
     B: Responder,
-    B::Error: ResponseError + 'static,
 {
     type Error = Error;
     type Future<'f> = impl Future<Output = Result<Response, Self::Error>>;
 
     fn respond_to(self, req: &HttpRequest) -> Self::Future<'_> {
         async move {
-            let res = match self {
-                Either::A(a) => a.respond_to(req).await?,
-                Either::B(b) => b.respond_to(req).await?,
-            };
-            Ok(res)
+            match self {
+                Either::A(a) => a.respond_to(req).await.map_err(Into::into),
+                Either::B(b) => b.respond_to(req).await.map_err(Into::into),
+            }
         }
     }
 }

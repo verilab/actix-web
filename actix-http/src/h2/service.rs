@@ -110,7 +110,7 @@ where
 mod openssl {
     use actix_service::{fn_factory, fn_service};
     use actix_tls::openssl::{Acceptor, SslAcceptor, SslStream};
-    use actix_tls::{openssl::HandshakeError, TlsError};
+    use actix_tls::{openssl::Error as SslError, TlsError};
 
     use super::*;
 
@@ -131,7 +131,7 @@ mod openssl {
             Config = (),
             Request = T,
             Response = (),
-            Error = TlsError<HandshakeError<T>, DispatchError>,
+            Error = TlsError<SslError, DispatchError>,
             InitError = S::InitError,
         > {
             pipeline_factory(

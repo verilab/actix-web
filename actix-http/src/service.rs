@@ -216,8 +216,8 @@ where
 #[cfg(feature = "openssl")]
 mod openssl {
     use super::*;
-    use actix_tls::openssl::{Acceptor, HandshakeError, SslAcceptor, SslStream};
-    use actix_tls::TlsError;
+    use actix_tls::openssl::{Acceptor, SslAcceptor, SslStream};
+    use actix_tls::{openssl::Error as SSlError, TlsError};
 
     impl<T, S, B, X, U> HttpService<SslStream<T>, S, B, X, U>
     where
@@ -249,7 +249,7 @@ mod openssl {
             Config = (),
             Request = T,
             Response = (),
-            Error = TlsError<HandshakeError<T>, DispatchError>,
+            Error = TlsError<SSlError, DispatchError>,
             InitError = (),
         > {
             pipeline_factory(

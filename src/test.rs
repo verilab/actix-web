@@ -239,7 +239,7 @@ where
 ///             web::resource("/people")
 ///                 .route(web::post().to(|person: web::Json<Person>| async {
 ///                     HttpResponse::Ok()
-///                         .json(person.into_inner())})
+///                         .json(&person.into_inner())})
 ///                     ))
 ///     ).await;
 ///
@@ -299,7 +299,7 @@ where
 ///             web::resource("/people")
 ///                 .route(web::post().to(|person: web::Json<Person>| async {
 ///                     HttpResponse::Ok()
-///                         .json(person.into_inner())})
+///                         .json(&person.into_inner())})
 ///                     ))
 ///     ).await;
 ///
@@ -1135,7 +1135,7 @@ mod tests {
     async fn test_response_json() {
         let mut app = init_service(App::new().service(web::resource("/people").route(
             web::post().to(|person: web::Json<Person>| {
-                HttpResponse::Ok().json(person.into_inner())
+                HttpResponse::Ok().json(&person.into_inner())
             }),
         )))
         .await;
@@ -1156,7 +1156,7 @@ mod tests {
     async fn test_body_json() {
         let mut app = init_service(App::new().service(web::resource("/people").route(
             web::post().to(|person: web::Json<Person>| {
-                HttpResponse::Ok().json(person.into_inner())
+                HttpResponse::Ok().json(&person.into_inner())
             }),
         )))
         .await;
@@ -1178,7 +1178,7 @@ mod tests {
     async fn test_request_response_form() {
         let mut app = init_service(App::new().service(web::resource("/people").route(
             web::post().to(|person: web::Form<Person>| {
-                HttpResponse::Ok().json(person.into_inner())
+                HttpResponse::Ok().json(&person.into_inner())
             }),
         )))
         .await;
@@ -1204,7 +1204,7 @@ mod tests {
     async fn test_request_response_json() {
         let mut app = init_service(App::new().service(web::resource("/people").route(
             web::post().to(|person: web::Json<Person>| {
-                HttpResponse::Ok().json(person.into_inner())
+                HttpResponse::Ok().json(&person.into_inner())
             }),
         )))
         .await;

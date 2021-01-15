@@ -5,6 +5,7 @@ use std::{
     convert::TryInto,
     fmt,
     future::Future,
+    ops,
     pin::Pin,
     str,
     task::{Context, Poll},
@@ -651,11 +652,15 @@ impl ResponseBuilder {
         self.body(Body::from_message(BodyStream::new(stream)))
     }
 
-    /// Set a json body and generate `Response`
+    /// Set a JSON body and generate `Response`.
     ///
     /// `ResponseBuilder` can not be used after this call.
-    pub fn json<T: Serialize>(&mut self, value: &T) -> Response {
-        match serde_json::to_string(value) {
+    pub fn json<T>(&mut self, value: T) -> Response
+    where
+        T: ops::Deref,
+        T::Target: Serialize,
+    {
+        match serde_json::to_string(value.deref()) {
             Ok(body) => {
                 let contains = if let Some(parts) = parts(&mut self.head, &self.err) {
                     parts.headers.contains_key(header::CONTENT_TYPE)
@@ -853,6 +858,8 @@ impl From<BytesMut> for Response {
 
 #[cfg(test)]
 mod tests {
+    use std::{borrow::Cow, rc::Rc};
+
     use serde_json::json;
 
     use super::*;
@@ -961,16 +968,41 @@ mod tests {
 
     #[test]
     fn test_json() {
-        let resp = Response::build(StatusCode::OK).json(&vec!["v1", "v2", "v3"]);
+        let resp = Response::Ok().json(vec!["v1", "v2", "v3"]);
+        let ct = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(ct, HeaderValue::from_static("application/json"));
+        assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
+
+        let resp = Response::Ok().json(&vec!["v1", "v2", "v3"]);
+        let ct = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(ct, HeaderValue::from_static("application/json"));
+        assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
+
+        let resp = Response::Ok().json(&mut vec!["v1", "v2", "v3"]);
+        let ct = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(ct, HeaderValue::from_static("application/json"));
+        assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
+
+        let resp = Response::Ok().json(Box::new(vec!["v1", "v2", "v3"]));
+        let ct = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(ct, HeaderValue::from_static("application/json"));
+        assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
+
+        let resp = Response::Ok().json(Rc::new(vec!["v1", "v2", "v3"]));
+        let ct = resp.headers().get(CONTENT_TYPE).unwrap();
+        assert_eq!(ct, HeaderValue::from_static("application/json"));
+        assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
+
+        let data: Cow<'_, Vec<&str>> = Cow::Owned(vec!["v1", "v2", "v3"]);
+        let resp = Response::Ok().json(data);
         let ct = resp.headers().get(CONTENT_TYPE).unwrap();
         assert_eq!(ct, HeaderValue::from_static("application/json"));
         assert_eq!(resp.body().get_ref(), b"[\"v1\",\"v2\",\"v3\"]");
     }
 
     #[test]
-    fn test_json_ct() {
+    fn test_json_custom_ct() {
         let resp = Response::build(StatusCode::OK)
-            .header(CONTENT_TYPE, "text/json")
             .insert_header((CONTENT_TYPE, "text/json"))
             .json(&vec!["v1", "v2", "v3"]);
         let ct = resp.headers().get(CONTENT_TYPE).unwrap();

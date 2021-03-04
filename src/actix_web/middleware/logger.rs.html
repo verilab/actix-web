@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/middleware/logger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>logger.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="https://actix.rs/favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu">&#9776;</div><a href='../../../actix_web/index.html'><div class='logo-container'><img src='https://actix.rs/img/logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/middleware/logger.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>logger.rs - source</title><link rel="stylesheet" type="text/css" href="../../../normalize.css"><link rel="stylesheet" type="text/css" href="../../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" type="text/css" href="../../../light.css"  id="themeStyle"><link rel="stylesheet" type="text/css" href="../../../dark.css" disabled ><link rel="stylesheet" type="text/css" href="../../../ayu.css" disabled ><script id="default-settings"></script><script src="../../../storage.js"></script><noscript><link rel="stylesheet" href="../../../noscript.css"></noscript><link rel="shortcut icon" href="https://actix.rs/favicon.ico"><style type="text/css">#crate-search{background-image:url("../../../down-arrow.svg");}</style></head><body class="rustdoc source"><!--[if lte IE 8]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="sidebar-menu" role="button">&#9776;</div><a href='../../../actix_web/index.html'><div class='logo-container'><img src='https://actix.rs/img/logo.png' alt='logo'></div></a></nav><div class="theme-picker"><button id="theme-picker" aria-label="Pick another theme!" aria-haspopup="menu"><img src="../../../brush.svg" width="18" alt="Pick another theme!"></button><div id="theme-choices" role="menu"></div></div><script src="../../../theme.js"></script><nav class="sub"><form class="search-form"><div class="search-container"><div><select id="crate-search"><option value="All crates">All crates</option></select><input class="search-input" name="search" disabled autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"></div><button type="button" class="help-button">?</button>
                 <a id="settings-menu" href="../../../settings.html"><img src="../../../wheel.svg" width="18" alt="Change settings"></a></div></form></nav><section id="main" class="content"><pre class="line-numbers"><span id="1">  1</span>
 <span id="2">  2</span>
 <span id="3">  3</span>
@@ -807,12 +807,6 @@
 <span id="806">806</span>
 <span id="807">807</span>
 <span id="808">808</span>
-<span id="809">809</span>
-<span id="810">810</span>
-<span id="811">811</span>
-<span id="812">812</span>
-<span id="813">813</span>
-<span id="814">814</span>
 </pre><div class="example-wrap"><pre class="rust ">
 <span class="doccomment">//! For middleware documentation, see [`Logger`].</span>
 
@@ -858,7 +852,7 @@
 <span class="doccomment">/// 127.0.0.1:54278 &quot;GET /test HTTP/1.1&quot; 404 20 &quot;-&quot; &quot;HTTPie/2.2.0&quot; 0.001074</span>
 <span class="doccomment">/// ```</span>
 <span class="doccomment">///</span>
-<span class="doccomment">/// # Usage</span>
+<span class="doccomment">/// # Examples</span>
 <span class="doccomment">/// ```rust</span>
 <span class="doccomment">/// use actix_web::{middleware::Logger, App};</span>
 <span class="doccomment">///</span>
@@ -953,9 +947,9 @@
     ) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span> {
         <span class="kw">let</span> <span class="ident">inner</span> <span class="op">=</span> <span class="ident">Rc</span>::<span class="ident">get_mut</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>.<span class="number">0</span>).<span class="ident">unwrap</span>();
 
-        <span class="kw">let</span> <span class="ident">ft</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">format</span>.<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">find</span>(<span class="op">|</span><span class="ident">ft</span><span class="op">|</span> {
-            <span class="macro">matches</span><span class="macro">!</span>(<span class="ident">ft</span>, <span class="ident">FormatText</span>::<span class="ident">CustomRequest</span>(<span class="ident">unit_label</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">label</span> <span class="op">=</span><span class="op">=</span> <span class="ident">unit_label</span>)
-        });
+        <span class="kw">let</span> <span class="ident">ft</span> <span class="op">=</span> <span class="ident">inner</span>.<span class="ident">format</span>.<span class="number">0</span>.<span class="ident">iter_mut</span>().<span class="ident">find</span>(
+            <span class="op">|</span><span class="ident">ft</span><span class="op">|</span> <span class="macro">matches</span><span class="macro">!</span>(<span class="ident">ft</span>, <span class="ident">FormatText</span>::<span class="ident">CustomRequest</span>(<span class="ident">unit_label</span>, <span class="kw">_</span>) <span class="kw">if</span> <span class="ident">label</span> <span class="op">=</span><span class="op">=</span> <span class="ident">unit_label</span>),
+        );
 
         <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">FormatText</span>::<span class="ident">CustomRequest</span>(<span class="kw">_</span>, <span class="ident">request_fn</span>)) <span class="op">=</span> <span class="ident">ft</span> {
             <span class="comment">// replace into None or previously registered fn using same label</span>
@@ -1035,7 +1029,7 @@
 
     <span class="ident">actix_service</span>::<span class="macro">forward_ready</span><span class="macro">!</span>(<span class="ident">service</span>);
 
-    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="kw-2">mut</span> <span class="self">self</span>, <span class="ident">req</span>: <span class="ident">ServiceRequest</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Future</span> {
+    <span class="kw">fn</span> <span class="ident">call</span>(<span class="kw-2">&amp;</span><span class="self">self</span>, <span class="ident">req</span>: <span class="ident">ServiceRequest</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="self">Self</span>::<span class="ident">Future</span> {
         <span class="kw">if</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">exclude</span>.<span class="ident">contains</span>(<span class="ident">req</span>.<span class="ident">path</span>())
             <span class="op">|</span><span class="op">|</span> <span class="self">self</span>.<span class="ident">inner</span>.<span class="ident">exclude_regex</span>.<span class="ident">is_match</span>(<span class="ident">req</span>.<span class="ident">path</span>())
         {
@@ -1179,8 +1173,7 @@
     <span class="doccomment">/// Returns `None` if the format string syntax is incorrect.</span>
     <span class="kw">pub</span> <span class="kw">fn</span> <span class="ident">new</span>(<span class="ident">s</span>: <span class="kw-2">&amp;</span><span class="ident">str</span>) <span class="op">-</span><span class="op">&gt;</span> <span class="ident">Format</span> {
         <span class="ident">log</span>::<span class="macro">trace</span><span class="macro">!</span>(<span class="string">&quot;Access log format: {}&quot;</span>, <span class="ident">s</span>);
-        <span class="kw">let</span> <span class="ident">fmt</span> <span class="op">=</span>
-            <span class="ident">Regex</span>::<span class="ident">new</span>(<span class="string">r&quot;%(\{([A-Za-z0-9\-_]+)\}([aioe]|xi)|[atPrUsbTD]?)&quot;</span>).<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">fmt</span> <span class="op">=</span> <span class="ident">Regex</span>::<span class="ident">new</span>(<span class="string">r&quot;%(\{([A-Za-z0-9\-_]+)\}([aioe]|xi)|[atPrUsbTD]?)&quot;</span>).<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">idx</span> <span class="op">=</span> <span class="number">0</span>;
         <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">results</span> <span class="op">=</span> <span class="ident">Vec</span>::<span class="ident">new</span>();
@@ -1201,12 +1194,12 @@
                             <span class="macro">unreachable</span><span class="macro">!</span>()
                         }
                     }
-                    <span class="string">&quot;i&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">FormatText</span>::<span class="ident">RequestHeader</span>(
-                        <span class="ident">HeaderName</span>::<span class="ident">try_from</span>(<span class="ident">key</span>.<span class="ident">as_str</span>()).<span class="ident">unwrap</span>(),
-                    ),
-                    <span class="string">&quot;o&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">FormatText</span>::<span class="ident">ResponseHeader</span>(
-                        <span class="ident">HeaderName</span>::<span class="ident">try_from</span>(<span class="ident">key</span>.<span class="ident">as_str</span>()).<span class="ident">unwrap</span>(),
-                    ),
+                    <span class="string">&quot;i&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">FormatText</span>::<span class="ident">RequestHeader</span>(<span class="ident">HeaderName</span>::<span class="ident">try_from</span>(<span class="ident">key</span>.<span class="ident">as_str</span>()).<span class="ident">unwrap</span>())
+                    }
+                    <span class="string">&quot;o&quot;</span> <span class="op">=</span><span class="op">&gt;</span> {
+                        <span class="ident">FormatText</span>::<span class="ident">ResponseHeader</span>(<span class="ident">HeaderName</span>::<span class="ident">try_from</span>(<span class="ident">key</span>.<span class="ident">as_str</span>()).<span class="ident">unwrap</span>())
+                    }
                     <span class="string">&quot;e&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">FormatText</span>::<span class="ident">EnvironHeader</span>(<span class="ident">key</span>.<span class="ident">as_str</span>().<span class="ident">to_owned</span>()),
                     <span class="string">&quot;xi&quot;</span> <span class="op">=</span><span class="op">&gt;</span> <span class="ident">FormatText</span>::<span class="ident">CustomRequest</span>(<span class="ident">key</span>.<span class="ident">as_str</span>().<span class="ident">to_owned</span>(), <span class="prelude-val">None</span>),
                     <span class="kw">_</span> <span class="op">=</span><span class="op">&gt;</span> <span class="macro">unreachable</span><span class="macro">!</span>(),
@@ -1349,9 +1342,7 @@
                 };
             }
             <span class="ident">FormatText</span>::<span class="ident">UrlPath</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">FormatText</span>::<span class="ident">Str</span>(<span class="ident">req</span>.<span class="ident">path</span>().<span class="ident">to_string</span>()),
-            <span class="ident">FormatText</span>::<span class="ident">RequestTime</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">FormatText</span>::<span class="ident">Str</span>(<span class="ident">now</span>.<span class="ident">format</span>(<span class="string">&quot;%Y-%m-%dT%H:%M:%S&quot;</span>))
-            }
+            <span class="ident">FormatText</span>::<span class="ident">RequestTime</span> <span class="op">=</span><span class="op">&gt;</span> <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">FormatText</span>::<span class="ident">Str</span>(<span class="ident">now</span>.<span class="ident">format</span>(<span class="string">&quot;%Y-%m-%dT%H:%M:%S&quot;</span>)),
             <span class="ident">FormatText</span>::<span class="ident">RequestHeader</span>(<span class="kw-2">ref</span> <span class="ident">name</span>) <span class="op">=</span><span class="op">&gt;</span> {
                 <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">val</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">headers</span>().<span class="ident">get</span>(<span class="ident">name</span>) {
                     <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Ok</span>(<span class="ident">s</span>) <span class="op">=</span> <span class="ident">val</span>.<span class="ident">to_str</span>() {
@@ -1373,8 +1364,7 @@
                 <span class="kw-2">*</span><span class="self">self</span> <span class="op">=</span> <span class="ident">s</span>;
             }
             <span class="ident">FormatText</span>::<span class="ident">RealIPRemoteAddr</span> <span class="op">=</span><span class="op">&gt;</span> {
-                <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">remote</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">connection_info</span>().<span class="ident">realip_remote_addr</span>()
-                {
+                <span class="kw">let</span> <span class="ident">s</span> <span class="op">=</span> <span class="kw">if</span> <span class="kw">let</span> <span class="prelude-val">Some</span>(<span class="ident">remote</span>) <span class="op">=</span> <span class="ident">req</span>.<span class="ident">connection_info</span>().<span class="ident">realip_remote_addr</span>() {
                     <span class="ident">FormatText</span>::<span class="ident">Str</span>(<span class="ident">remote</span>.<span class="ident">to_string</span>())
                 } <span class="kw">else</span> {
                     <span class="ident">FormatText</span>::<span class="ident">Str</span>(<span class="string">&quot;-&quot;</span>.<span class="ident">to_string</span>())
@@ -1425,7 +1415,7 @@
         };
         <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">Logger</span>::<span class="ident">new</span>(<span class="string">&quot;%% %{User-Agent}i %{X-Test}o %{HOME}e %D test&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">srv</span>.<span class="ident">into_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">srv</span>.<span class="ident">into_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">TestRequest</span>::<span class="ident">default</span>()
             .<span class="ident">insert_header</span>((
@@ -1445,10 +1435,10 @@
                     .<span class="ident">finish</span>(),
             ))
         };
-        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span> <span class="ident">Logger</span>::<span class="ident">new</span>(<span class="string">&quot;%% %{User-Agent}i %{X-Test}o %{HOME}e %D test&quot;</span>)
-            .<span class="ident">exclude_regex</span>(<span class="string">&quot;\\w&quot;</span>);
+        <span class="kw">let</span> <span class="ident">logger</span> <span class="op">=</span>
+            <span class="ident">Logger</span>::<span class="ident">new</span>(<span class="string">&quot;%% %{User-Agent}i %{X-Test}o %{HOME}e %D test&quot;</span>).<span class="ident">exclude_regex</span>(<span class="string">&quot;\\w&quot;</span>);
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">srv</span>.<span class="ident">into_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">srv</span>.<span class="ident">into_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">TestRequest</span>::<span class="ident">default</span>()
             .<span class="ident">insert_header</span>((
@@ -1559,9 +1549,7 @@
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">TestRequest</span>::<span class="ident">default</span>()
             .<span class="ident">insert_header</span>((
                 <span class="ident">header</span>::<span class="ident">FORWARDED</span>,
-                <span class="ident">header</span>::<span class="ident">HeaderValue</span>::<span class="ident">from_static</span>(
-                    <span class="string">&quot;for=192.0.2.60;proto=http;by=203.0.113.43&quot;</span>,
-                ),
+                <span class="ident">header</span>::<span class="ident">HeaderValue</span>::<span class="ident">from_static</span>(<span class="string">&quot;for=192.0.2.60;proto=http;by=203.0.113.43&quot;</span>),
             ))
             .<span class="ident">to_srv_request</span>();
 
@@ -1622,7 +1610,7 @@
                 <span class="ident">captured</span>.<span class="ident">to_owned</span>()
             });
 
-        <span class="kw">let</span> <span class="kw-2">mut</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">test</span>::<span class="ident">ok_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
+        <span class="kw">let</span> <span class="ident">srv</span> <span class="op">=</span> <span class="ident">logger</span>.<span class="ident">new_transform</span>(<span class="ident">test</span>::<span class="ident">ok_service</span>()).<span class="kw">await</span>.<span class="ident">unwrap</span>();
 
         <span class="kw">let</span> <span class="ident">req</span> <span class="op">=</span> <span class="ident">TestRequest</span>::<span class="ident">default</span>().<span class="ident">to_srv_request</span>();
         <span class="ident">srv</span>.<span class="ident">call</span>(<span class="ident">req</span>).<span class="kw">await</span>.<span class="ident">unwrap</span>();
